@@ -183,7 +183,9 @@ def release():
         json.dump(manifest, f, indent=4)
 
     # remove reserved files (beside README.md)
-    _remove_items(set(PATHS_TO_EXCLUDE).remove('README.md'))
+    paths_to_remove = set(PATHS_TO_EXCLUDE)
+    paths_to_remove.remove('README.md')
+    _remove_items(paths_to_remove)
 
     # Run pack job
     version_tag = manifest['version']
