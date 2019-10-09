@@ -22,9 +22,13 @@ jobs:
     - name: Install hub
       uses: geertvdc/setup-hub@1.0.0
 
+    - name: Download scripts
+      run: curl https://raw.githubusercontent.com/FriendsOfGalaxy/galaxy-integrations-updater/master/scripts.py --output ../scripts.py
+
     - name: Create tag, release and assets
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPOSITORY: ${{ github.repository }}
       run: python ../scripts.py release
 
     - name: Update Release File

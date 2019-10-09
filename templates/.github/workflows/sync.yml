@@ -20,9 +20,11 @@ jobs:
     - name: Install hub
       uses: geertvdc/setup-hub@v1.0.0
 
+    - name: Download scripts
+      run: curl https://raw.githubusercontent.com/FriendsOfGalaxy/galaxy-integrations-updater/master/scripts.py --output ../scripts.py
+
     - name: Check and sync to PR
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         REPOSITORY: ${{ github.repository }}
-      run: |
-        python ../scripts.py sync
+      run: python ../scripts.py sync

@@ -14,6 +14,9 @@ sys.path.insert(0, '.fog')
 import config
 
 
+_ENV_TOKEN = os.environ['GITHUB_TOKEN']
+_ENV_REPOSITORY = os.environ['REPOSITORY']
+
 GITHUB = 'https://github.com'
 MANIFEST_LOCATION = os.path.join(config.SRC, 'manifest.json')
 
@@ -33,11 +36,10 @@ RELEASE_INFO_FILE = os.path.join('..', 'release_info')
 
 FOG_BASE = 'master'
 FOG_PR_BRANCH = 'autoupdate'
-PATHS_TO_EXCLUDE = ['README.md', '.github/', '.fog/', RELEASE_FILE]
-# remote names mathcing `hub` heuristics: https://github.com/github/hub/issues/2296
-UPSTREAM_REMOTE = '_upstream'
+UPSTREAM_REMOTE = '_upstream'  # '_' to avoid `hub` heuristics: https://github.com/github/hub/issues/2296
 ORIGIN_REMOTE = 'origin'
-UPDATE_URL = 'https://raw.githubusercontent.com/{repository}/' + FOG_BASE + '/' + RELEASE_FILE
+UPDATE_URL = f'https://raw.githubusercontent.com/{_ENV_REPOSITORY}/{FOG_BASE}/{RELEASE_FILE}'
+PATHS_TO_EXCLUDE = ['README.md', '.github/', '.fog/', RELEASE_FILE]
 
 
 def _run(*args, **kwargs):
@@ -85,9 +87,7 @@ def _load_upstream_version():
 
 
 def _fog_git_init(upstream=None):
-    token = os.environ['GITHUB_TOKEN']
-    repository = os.environ['REPOSITORY']
-    origin = f'https://{FOG}:{token}@github.com/{repository}.git'
+    origin = f'https://{FOG}:{_ENV_TOKEN}@github.com/{_ENV_REPOSITORY}.git'
 
     _run(f'git config user.name {FOG}')
     _run(f'git config user.email {FOG_EMAIL}')
@@ -97,8 +97,7 @@ def _fog_git_init(upstream=None):
 
 
 def _is_pr_open():
-    repository = os.environ['REPOSITORY']
-    url = f"https://api.github.com/repos/{repository}/pulls?base={FOG_BASE}&head={FOG}:{FOG_PR_BRANCH}&state=open"
+    url = f"https://api.github.com/repos/{_ENV_REPOSITORY}/pulls?base={FOG_BASE}&head={FOG}:{FOG_PR_BRANCH}&state=open"
     resp = urllib.request.urlopen(url)
     prs = json.loads(resp.read().decode('utf-8'))
     if len(prs):
@@ -149,9 +148,8 @@ def sync():
     upstream_version = _load_upstream_version()
     if StrictVersion(upstream_version) <= StrictVersion(pr_branch_version):
         raise RuntimeError(
-            '================\n'  \
-            'No new version to be sync to. ' \
-            f'Upstream: {upstream_version}, fork {FOG_PR_BRANCH}: {pr_branch_version}'
+            '====== No new version to be sync to.' \
+            f'Upstream: {upstream_version}, fork {FOG_PR_BRANCH}: {pr_branch_version} ====='
         )
 
     _sync_pr()
@@ -175,10 +173,9 @@ def _simple_archiver(output):
 
 def release():
     # Add update_url in manifest
-    repo = os.environ['REPOSITORY']
     with open(MANIFEST_LOCATION, 'r') as f:
         manifest = json.load(f)
-    manifest['update_url'] = UPDATE_URL.format(repository=repo)
+    manifest['update_url'] = UPDATE_URL
     with open(MANIFEST_LOCATION, 'w') as f:
         json.dump(manifest, f, indent=4)
 
