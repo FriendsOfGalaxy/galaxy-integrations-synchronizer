@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import shlex
+import errno
 import shutil
 import pathlib
 import subprocess
@@ -63,6 +64,8 @@ def _run(*args, **kwargs):
 
 def _remove_items(paths):
     """Silently removes files or whole dir trees"""
+    _run('pwd')
+    print('paths to remove:', paths)
     for reserved_path in paths:
         try:
             try:
@@ -148,7 +151,7 @@ def sync():
     upstream_version = _load_upstream_version()
     if StrictVersion(upstream_version) <= StrictVersion(pr_branch_version):
         raise RuntimeError(
-            '====== No new version to be sync to.' \
+            '====== No new version to be sync to. ' \
             f'Upstream: {upstream_version}, fork {FOG_PR_BRANCH}: {pr_branch_version} ====='
         )
 
