@@ -11,7 +11,8 @@ import subprocess
 import urllib.request
 from distutils.version import StrictVersion
 
-sys.path.insert(0, '.fog')
+FOG_DIR = '.fog'
+sys.path.insert(0, FOG_DIR)
 import config
 
 
@@ -40,7 +41,7 @@ FOG_PR_BRANCH = 'autoupdate'
 UPSTREAM_REMOTE = '_upstream'  # '_' to avoid `hub` heuristics: https://github.com/github/hub/issues/2296
 ORIGIN_REMOTE = 'origin'
 UPDATE_URL = f'https://raw.githubusercontent.com/{_ENV_REPOSITORY}/{FOG_BASE}/{RELEASE_FILE}'
-PATHS_TO_EXCLUDE = ['README.md', '.github/', '.fog/', RELEASE_FILE]
+PATHS_TO_EXCLUDE = ['README.md', '.github/', FOG_DIR, RELEASE_FILE]
 
 
 def _run(*args, **kwargs):
@@ -182,9 +183,8 @@ def release():
     with open(MANIFEST_LOCATION, 'w') as f:
         json.dump(manifest, f, indent=4)
 
-    # remove reserved files (beside README.md)
-    paths_to_remove = set(PATHS_TO_EXCLUDE)
-    paths_to_remove.remove('README.md')
+    # remove reserved files (beside FOG_DIR and README.md)
+    paths_to_remove = set(PATHS_TO_EXCLUDE) - {FOG_DIR, 'README.md'}
     _remove_items(paths_to_remove)
 
     # Run pack job
