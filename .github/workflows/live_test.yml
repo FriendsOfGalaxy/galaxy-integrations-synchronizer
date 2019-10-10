@@ -7,7 +7,7 @@ on:
       - master
 
 jobs:
-  build:
+  update_test_repo:
     runs-on: ubuntu-18.04
     steps:
 
@@ -18,12 +18,7 @@ jobs:
       with:
         python-version: 3.7
 
-    # - name: Install hub
-    #   uses: geertvdc/setup-hub@v1.0.0
-
-    - name: Increment version in test repository
-      env:
-        GITHUB_TOKEN: ${{ secrets.TEST_REPO_TOKEN }}
+    - name: Update test repository code
       run: |
         git clone https://FriendsOfGalaxyTester:${{ secrets.TEST_REPO_TOKEN }}@github.com/FriendsOfGalaxyTester/test-integration.git
         cd test-integration
@@ -32,3 +27,12 @@ jobs:
         python autoincrement.py
         git commit -a -m "autoincrement"
         git push origin master
+
+    - name: Trigger sync event on test repo fork
+      env:
+        GITHUB_TOKEN: ${{ secrets.TEST_REPO_TOKEN }}
+      run: |
+        curl POST -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: "application/vnd.github.everest-preview+json, application/vnd.github.v3+json"  \
+          https://api.github.com/repos/FriendsOfGalaxy/test-integration-fork/dispatches
+          --data '{"event_type": "sync"}'
