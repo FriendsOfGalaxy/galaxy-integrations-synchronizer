@@ -27,12 +27,16 @@ jobs:
         python autoincrement.py
         git commit -a -m "autoincrement"
         git push origin master
+        cd ..
+
+    - name: Install hub
+      uses: geertvdc/setup-hub@v1.0.0
 
     - name: Trigger sync event on test repo fork
       env:
-        GITHUB_TOKEN: ${{ secrets.TEST_REPO_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PTOKEN }}
       run: |
-        curl POST -H "Authorization: token $GITHUB_TOKEN" \
-          -H "Accept: "application/vnd.github.everest-preview+json, application/vnd.github.v3+json"  \
-          https://api.github.com/repos/FriendsOfGalaxy/test-integration-fork/dispatches
-          --data '{"event_type": "sync"}'
+        hub api -t -X POST -H "Authorization:token $GITHUB_TOKEN" \
+        -H "Accept:application/vnd.github.everest-preview+json,application/vnd.github.v3+json" \
+        https://api.github.com/repos/FriendsOfGalaxy/test-integration-fork/dispatches \
+        -F event_type=sync
