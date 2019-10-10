@@ -1,0 +1,34 @@
+
+name: Live test
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+
+    - uses: actions/checkout@v1
+
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+
+    # - name: Install hub
+    #   uses: geertvdc/setup-hub@v1.0.0
+
+    - name: Increment version in test repository
+      env:
+        GITHUB_TOKEN: ${{ secrets.TEST_REPO_TOKEN }}
+      run: |
+        git clone https://FriendsOfGalaxyTester:${{ secrets.TEST_REPO_TOKEN }}@github.com/FriendsOfGalaxyTester/test-integration.git
+        cd test-integration
+        git config --local user.email "FriendsOfGalaxy+1@gmail.com"
+        git config --local user.name "FriendsOfGalaxyTester"
+        python autoincrement.py
+        git commit -a -m "autoincrement"
+        git push origin master
