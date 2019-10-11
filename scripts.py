@@ -64,7 +64,7 @@ def _run(*args, **kwargs):
 
 
 def _remove_items(paths):
-    """Silently removes files or whole dir trees"""
+    """Silently removes files or whole dir trees."""
     _run('pwd')
     print('paths to remove:', paths)
     for reserved_path in paths:
@@ -207,6 +207,7 @@ def release():
         '-m', RELEASE_MESSAGE.format(tag=version_tag),
         *asset_cmd
     )
+
 
 def update_release_file():
     version_tag = _load_version()

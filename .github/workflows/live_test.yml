@@ -20,15 +20,19 @@ jobs:
       with:
         python-version: 3.7
 
-    - name: Update test repository code
+    - name: Update and release test repository
+      env:
+        GITHUB_TOKEN: ${{ secrets.TEST_REPO_TOKEN }}
       run: |
         git clone https://FriendsOfGalaxyTester:${{ secrets.TEST_REPO_TOKEN }}@github.com/FriendsOfGalaxyTester/test-integration.git
         cd test-integration
+        pip install -r requirements.txt
         git config --local user.email "FriendsOfGalaxy+1@gmail.com"
         git config --local user.name "FriendsOfGalaxyTester"
-        python autoincrement.py
+        inv autoincrement
         git commit -a -m "autoincrement"
         git push origin master
+        inv release
         cd ..
 
     - name: Install hub
