@@ -28,7 +28,12 @@ def test_manifest_version_versus_master_branch(manifest, capsys):
     """Galaxy downloads plugins only if the version is higher than in local copy.
     Check if new version will be bumped using StrictVersion comparizon
     """
-    proc = subprocess.run(f"git show origin/master:current_version.json", check=False, text=True, capture_output=True)
+    proc = subprocess.run(
+        ["git", "show", "origin/master:current_version.json"],
+        check=False,
+        text=True,
+        capture_output=True
+    )
     if proc.returncode != 0:
         with capsys.disabled():
             print(f"\nLooks like this is the first remote version of this fork: {proc.stderr}")

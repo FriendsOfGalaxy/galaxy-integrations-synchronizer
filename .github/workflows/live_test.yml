@@ -1,12 +1,11 @@
-
 name: Live test
 
 on:
   push:
     branches:
-      - master
+    - master
     paths:
-      - scripts.py
+    - 'scripts.py'
 
 jobs:
   update_test_repo:
