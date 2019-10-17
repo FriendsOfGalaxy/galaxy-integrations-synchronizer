@@ -1,28 +1,38 @@
-"""Common tests shared between all our forks."""
+"""Common tests shared between all our forks.
+They are run versus build_directory specified as TARGET environmental variable
+"""
 
 import os
 import sys
 import json
+import pytest
+import logging
 import subprocess
 from distutils.version import StrictVersion
 
-sys.path.insert(0, '.fog')
-import config
 
-
-def test_manifest():
-
-    manifest_location = os.path.join(config.SRC, 'manifest.json')
-    with open(manifest_location, 'r') as f:
+@pytest.fixture()
+def manifest():
+    target_dir = os.environ['TARGET']
+    with open(target_dir + '/manifest.json', 'r') as f:
         manifest = json.load(f)
+    return manifest
 
-    for i in ["name", "platform", "guid", "version", "description", "author", "email", "url", "script"]:
+
+def test_manifest_elements(manifest):
+    for i in ["name", "platform", "guid", "version", "description", "author", "email", "url", "script", "update_url"]:
         assert i in manifest
 
-    base_ref = os.environ['BASE_REF']
-    prev_manifest  = '__prev_manifest.json'
-    subprocess.run(f"git show origin/{base_ref}:{manifest_location} > {prev_manifest}", shell=True)
-    with open(prev_manifest, 'r') as f:
-        prev_manifest = json.load(f)
 
-    assert StrictVersion(manifest['version']) > StrictVersion(prev_manifest['version'])
+def test_manifest_version_versus_master_branch(manifest, capsys):
+    """Galaxy downloads plugins only if the version is higher than in local copy.
+    Check if new version will be bumped using StrictVersion comparizon
+    """
+    proc = subprocess.run(f"git show origin/master:current_version.json", check=False, text=True, capture_output=True)
+    if proc.returncode != 0:
+        with capsys.disabled():
+            print(f"\nLooks like this is the first remote version of this fork: {proc.stderr}")
+        return
+    prev_ver = json.loads(proc.stdout)['tag_name']
+
+    assert StrictVersion(manifest['version']) > StrictVersion(prev_ver)

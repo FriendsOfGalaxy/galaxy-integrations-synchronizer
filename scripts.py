@@ -3,12 +3,16 @@
 import os
 import sys
 import json
+import glob
 import shlex
 import errno
 import shutil
 import pathlib
+import tempfile
 import subprocess
 import urllib.request
+from distutils.dir_util import copy_tree
+from distutils.file_util import copy_file
 from distutils.version import StrictVersion
 
 FOG_DIR = '.fog'
@@ -17,10 +21,21 @@ import config
 
 
 _ENV_TOKEN = os.environ['GITHUB_TOKEN']
+_ENV_TOKEN = os.environ['GITHUB_TOKEN']
 _ENV_REPOSITORY = os.environ['REPOSITORY']
 
 GITHUB = 'https://github.com'
-MANIFEST_LOCATION = os.path.join(config.SRC, 'manifest.json')
+
+def _localize_manifest_dir():
+    """Search for directory where manifest.json is placed starting with cwd"""
+    for root, dirs, files in os.walk('.'):
+        if 'manifest.json' in files:
+            return root
+
+MANIFEST_DIR = _localize_manifest_dir()
+MANIFEST_LOCATION = os.path.join(MANIFEST_DIR, 'manifest.json')
+
+REQUIREMENTS_PATH = 'requirements.txt'
 
 if config.UPSTREAM.startswith(GITHUB):
     UPSTREAM_USER_REPO = config.UPSTREAM.split('/', 3)[-1]
@@ -33,15 +48,14 @@ FOG_EMAIL = 'FriendsOfGalaxy@gmail.com'
 RELEASE_MESSAGE = "Release version {tag}\n\nVersion {tag}"
 RELEASE_FILE ="current_version.json"
 RELEASE_FILE_COMMIT_MESSAGE = "Updated current_version.json"
-BUILD_DIR = os.path.join('..', 'assets')
-RELEASE_INFO_FILE = os.path.join('..', 'release_info')
+DIST_DIR = os.path.join('..', 'assets')
 
 FOG_BASE = 'master'
 FOG_PR_BRANCH = 'autoupdate'
 UPSTREAM_REMOTE = '_upstream'  # '_' to avoid `hub` heuristics: https://github.com/github/hub/issues/2296
 ORIGIN_REMOTE = 'origin'
 UPDATE_URL = f'https://raw.githubusercontent.com/{_ENV_REPOSITORY}/{FOG_BASE}/{RELEASE_FILE}'
-PATHS_TO_EXCLUDE = ['README.md', '.github/', FOG_DIR, RELEASE_FILE]
+PATHS_TO_EXCLUDE = ['README.md', '.git/', '.github/', FOG_DIR, RELEASE_FILE]
 
 
 def _run(*args, **kwargs):
@@ -55,27 +69,12 @@ def _run(*args, **kwargs):
     try:
         out.check_returncode()
     except subprocess.CalledProcessError as e:
-        err_str = e.output + '\n' + e.stderr
+        err_str = f'{e.output}\n{e.stderr}'
         print('><', err_str)
         raise
     else:
         print('>>', out.stdout)
     return out
-
-
-def _remove_items(paths):
-    """Silently removes files or whole dir trees."""
-    _run('pwd')
-    print('paths to remove:', paths)
-    for reserved_path in paths:
-        try:
-            try:
-                os.remove(reserved_path)
-            except IsADirectoryError:
-                shutil.rmtree(reserved_path)
-        except OSError as e:
-            if e.errno != errno.ENOENT:  # file not exists
-                raise
 
 
 def _load_version():
@@ -88,6 +87,20 @@ def _load_upstream_version():
     resp = urllib.request.urlopen(url)
     upstream_manifest = json.loads(resp.read().decode('utf-8'))
     return upstream_manifest['version']
+
+
+def _remove_items(paths):
+    """Silently removes files or whole dir trees."""
+    print('removing paths:', paths)
+    for reserved_path in paths:
+        try:
+            try:
+                os.remove(reserved_path)
+            except IsADirectoryError:
+                shutil.rmtree(reserved_path)
+        except OSError as e:
+            if e.errno != errno.ENOENT:  # file not exists
+                raise
 
 
 def _fog_git_init(upstream=None):
@@ -163,46 +176,94 @@ def sync():
         _create_pr()
 
 
-def _simple_archiver(output):
-    """Generate zip assests in output path."""
+def build(output):
+    src = pathlib.Path(MANIFEST_DIR).resolve()
+    outpath = pathlib.Path(output).resolve()
+    try:
+        outpath.relative_to(src)
+    except ValueError:
+        pass
+    else:
+        raise RuntimeError("dist (output) cannot be part of src")
+
     if os.path.exists(output):
         shutil.rmtree(output)
-    os.makedirs(output)
 
-    zip_names = ['windows', 'macos']
-    for zip_name in zip_names:
-        asset = os.path.join(output, zip_name)
-        shutil.make_archive(asset, 'zip', root_dir=config.SRC, base_dir='.')
+    print(f'copy integration code ignoring {RELEASE_FILE}, tests and all hidden files')
+    to_ignore = shutil.ignore_patterns(RELEASE_FILE, '.*', 'test_*.py', '*_test.py', '*.pyc')
+    shutil.copytree(src, output, ignore=to_ignore)
 
+    env = os.environ.copy()
+    if sys.platform == "win32":
+        pip_platform = "win32"
+    elif sys.platform == "darwin":
+        pip_platform = "macosx_10_12_x86_64"
+        # making sure to work on macos 10.12 in case of building from sources
+        env["MACOSX_DEPLOYMENT_TARGET"] = "10.12"
 
-def release():
-    # Add update_url in manifest
-    with open(MANIFEST_LOCATION, 'r') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
+        _run(f'pip-compile {REQUIREMENTS_PATH} --output-file=-', stdout=tmp, stderr=subprocess.PIPE, capture_output=False)
+        _run('pip', 'install',
+            '-r', tmp.name,
+            '--platform', pip_platform,
+            '--target', output,
+            '--python-version', '37',
+            '--no-compile',
+            '--no-deps',
+            env=env
+        )
+    os.unlink(tmp.name)
+
+    print('clean up dist directories')
+    for dir_ in glob.glob(f"{output}/*.dist-info"):
+        shutil.rmtree(dir_)
+    for test in glob.glob(f"{output}/**/test_*.py", recursive=True):
+        os.remove(test)
+
+    print('add update_url entry in manifest')
+    with open(src / 'manifest.json', 'r') as f:
         manifest = json.load(f)
     manifest['update_url'] = UPDATE_URL
-    with open(MANIFEST_LOCATION, 'w') as f:
+    with open(output + '/manifest.json', 'w') as f:
         json.dump(manifest, f, indent=4)
 
-    # remove reserved files (beside FOG_DIR and README.md)
-    paths_to_remove = set(PATHS_TO_EXCLUDE) - {FOG_DIR, 'README.md'}
-    _remove_items(paths_to_remove)
 
-    # Run pack job
-    version_tag = manifest['version']
-    try:
-        packager = config.pack
-    except AttributeError:
-        packager = _simple_archiver
-    packager(BUILD_DIR)
+def release(build_dir):
+    """Zips dirs given in build_dir and upload them as github release
+    build_dir should contain asset for windows and/or macos.
+    Asset names should start with windows or macos (case insensitive)
+    """
+    asset_dirs = os.listdir(build_dir)
+    print(asset_dirs)
+    if not asset_dirs:
+        raise RuntimeError(f'No assets found in {build_dir}')
+
+    # Remove assets dir
+    if os.path.exists(DIST_DIR):
+        shutil.rmtree(DIST_DIR)
+    os.makedirs(DIST_DIR)
+
+    # Zip build assets
+    zip_names = {'windows', 'macos'}
+    for zip_name in zip_names:
+        for asset_dir in asset_dirs:
+            if asset_dir.lower().startswith(zip_name):
+                src = os.path.join(build_dir, asset_dir)
+                asset = os.path.join(DIST_DIR, zip_name)
+                shutil.make_archive(asset, 'zip', root_dir=src, base_dir='.')
+                break
+        else:
+            RuntimeError(f'No asset for {zip_name}!')
 
     # Prepare assets
     asset_cmd = []
-    _, _, filenames = next(os.walk(BUILD_DIR))
+    _, _, filenames = next(os.walk(DIST_DIR))
     for filename in filenames:
         asset_cmd.append('-a')
-        asset_cmd.append(str(pathlib.Path(BUILD_DIR).absolute() / filename))
+        asset_cmd.append(str(pathlib.Path(DIST_DIR).absolute() / filename))
 
     # Create and upload github tag and release with assets
+    version_tag = _load_version()
     _run('hub', 'release', 'create', version_tag,
         '-m', RELEASE_MESSAGE.format(tag=version_tag),
         *asset_cmd
@@ -241,10 +302,14 @@ if __name__ == "__main__":
     task = sys.argv[1]
 
     if task == 'release':
-        release()
+        build_dir = sys.argv[2]
+        release(build_dir)
     elif task == 'update_release_file':
         update_release_file()
     elif task == 'sync':
         sync()
+    elif task == 'build':
+        build_dir = sys.argv[2]
+        build(build_dir)
     else:
         raise RuntimeError(f'unknown command {task}')
