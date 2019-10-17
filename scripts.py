@@ -15,7 +15,7 @@ from distutils.dir_util import copy_tree
 from distutils.file_util import copy_file
 from distutils.version import StrictVersion
 
-FOG_DIR = '.fog'
+FOG_DIR = '.fog/'
 sys.path.insert(0, FOG_DIR)
 import config
 
@@ -55,7 +55,7 @@ FOG_PR_BRANCH = 'autoupdate'
 UPSTREAM_REMOTE = '_upstream'  # '_' to avoid `hub` heuristics: https://github.com/github/hub/issues/2296
 ORIGIN_REMOTE = 'origin'
 UPDATE_URL = f'https://raw.githubusercontent.com/{_ENV_REPOSITORY}/{FOG_BASE}/{RELEASE_FILE}'
-PATHS_TO_EXCLUDE = ['README.md', '.git/', '.github/', FOG_DIR, RELEASE_FILE]
+PATHS_TO_EXCLUDE = ['README.md', '.github/', FOG_DIR, RELEASE_FILE]
 
 
 def _run(*args, **kwargs):
