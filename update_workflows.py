@@ -12,9 +12,8 @@ class GitUserContext:
     def __init__(self, token, user, email):
         self.token = token
         self.user = user
-        self.email = email
-        self._run(f'git config --global user.email "{self.email}"')
-        self._run(f'git config --global user.name "{self.user}Bot"')
+        self._run(f'git config --global user.email "{email}"')
+        self._run(f'git config --global user.name "{user}Bot"')
 
     def _run(self, cmd: str, **kwargs):
         kwargs.setdefault("stdout", subprocess.PIPE)
@@ -43,7 +42,7 @@ if __name__ == "__main__":
         names = json.load(f)['forks_to_sync']
 
     tkn = os.environ['GITHUB_TOKEN']
-    fog = GitUserContext(tkn, 'FriendsOfGalaxy', 'FriendsOfGalaxy@gmail.com')
+    fog = GitUserContext(tkn, 'FriendsOfGalaxy', 'FriendsOfGalaxy+bot@gmail.com')
     for repo_name in names:
         fog.clone_repo(repo_name)
         fog.update_workflows(repo_name)
