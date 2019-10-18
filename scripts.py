@@ -21,7 +21,6 @@ import config
 
 
 _ENV_TOKEN = os.environ['GITHUB_TOKEN']
-_ENV_TOKEN = os.environ['GITHUB_TOKEN']
 _ENV_REPOSITORY = os.environ['REPOSITORY']
 
 GITHUB = 'https://github.com'
