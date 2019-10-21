@@ -9,37 +9,16 @@ import errno
 import shutil
 import pathlib
 import tempfile
+import argparse
 import subprocess
 import urllib.request
 from distutils.dir_util import copy_tree
 from distutils.file_util import copy_file
 from distutils.version import StrictVersion
 
-FOG_DIR = '.fog/'
-sys.path.insert(0, FOG_DIR)
-import config
-
-
-_ENV_TOKEN = os.environ['GITHUB_TOKEN']
-_ENV_REPOSITORY = os.environ['REPOSITORY']
-
-GITHUB = 'https://github.com'
-
-def _localize_manifest_dir():
-    """Search for directory where manifest.json is placed starting with cwd"""
-    for root, dirs, files in os.walk('.'):
-        if 'manifest.json' in files:
-            return root
-
-MANIFEST_DIR = _localize_manifest_dir()
-MANIFEST_LOCATION = os.path.join(MANIFEST_DIR, 'manifest.json')
-
-REQUIREMENTS_PATH = 'requirements.txt'
-
-if config.UPSTREAM.startswith(GITHUB):
-    UPSTREAM_USER_REPO = config.UPSTREAM.split('/', 3)[-1]
-else:
-    raise NotImplementedError(f'UPSTREAM does not starts with {GITHUB}. Other services not supported')
+# pip install PyGithub
+from github import Github
+import github
 
 FOG = 'FriendsOfGalaxy'
 FOG_EMAIL = 'FriendsOfGalaxy@gmail.com'
@@ -53,8 +32,127 @@ FOG_BASE = 'master'
 FOG_PR_BRANCH = 'autoupdate'
 UPSTREAM_REMOTE = '_upstream'  # '_' to avoid `hub` heuristics: https://github.com/github/hub/issues/2296
 ORIGIN_REMOTE = 'origin'
-UPDATE_URL = f'https://raw.githubusercontent.com/{_ENV_REPOSITORY}/{FOG_BASE}/{RELEASE_FILE}'
-PATHS_TO_EXCLUDE = ['README.md', '.github/', FOG_DIR, RELEASE_FILE]
+PATHS_TO_EXCLUDE = ['README.md', '.github/', RELEASE_FILE]
+
+
+class LocalRepo:
+    MANIFEST = 'manifest.json'
+    REQUIREMENTS = 'requirements.txt'
+
+    def __init__(self, branch=None, check_requirements=True):
+        if branch is not None and branch != self.current_branch:
+            self._checkout(branch)
+        if check_requirements:
+            assert self.requirements_path.exists()
+        self._manifest_dir = pathlib.Path(self._localize_manifest_dir())
+        self._manifest = None
+
+    @staticmethod
+    def _checkout(branch):
+        try:
+            _run(f'git checkout --track {ORIGIN_REMOTE}/{branch}')
+        except subprocess.CalledProcessError:  # no such branch on remote
+            _run(f'git checkout -b {branch}')
+            _run(f'git push -u {ORIGIN_REMOTE} {branch}')
+
+    def _localize_manifest_dir(self):
+        """Search for directory where manifest.json is placed starting with cwd"""
+        for root, dirs, files in os.walk('.'):
+            if self.MANIFEST in files:
+                return root
+
+    def load_manifest(self):
+        with open(self._manifest_dir / self.MANIFEST, 'r') as f:
+            self._manifest = json.load(f)
+        return self._manifest.copy()
+
+    @property
+    def current_branch(self):
+        proc = _run('git rev-parse --abbrev-ref HEAD')
+        return proc.stdout.strip()
+
+    @property
+    def manifest_path(self):
+        return self._manifest_dir / self.MANIFEST
+
+    @property
+    def requirements_path(self):
+        """Requirements file is required to be placed in root"""
+        return pathlib.Path(self.REQUIREMENTS)
+
+    @property
+    def version(self):
+        if self._manifest is None:
+            self.load_manifest()
+        return self._manifest['version']
+
+    @property
+    def manifest_dir(self):
+        return self._manifest_dir
+
+
+class FogRepoManager:
+    """Will eventually replace CLI Hub tool"""
+    FOG_RELEASE = 'fog_release'
+
+    def __init__(self, token, fork_repo):
+        self.token = token
+        self.fork = github.Github(token).get_repo(fork_repo)
+        self.parent = self.fork.parent
+
+    @property
+    def me(self):
+        return self.fork.owner.login
+
+    @property
+    def release_branch(self):
+        try:
+            return self.parent.get_branch(self.FOG_RELEASE).name
+        except github.GithubException as e:
+            if e.status == 404:
+                return self.parent.default_branch
+            raise
+
+    @property
+    def upstream_user_name(self):
+        return self.parent.full_name
+
+    def latest_parent_version(self, manifest_location):
+        if not str(manifest_location).startswith('/'):
+            manifest_location = '/' + str(manifest_location)
+        release_branch = self.release_branch
+        print(f'Looking for {manifest_location} in {self.parent.full_name}, branch: {release_branch}')
+        m_file = self.parent.get_contents(manifest_location, ref=release_branch)
+        if type(m_file) == list:
+            raise RuntimeError(f'Manifest not found in {manifest_location}! Maybe it has been moved?')
+        manifest = json.loads(m_file.decoded_content)
+        print(manifest)
+        return manifest['version']
+
+    # def is_autoupdate_pr_open(self):
+    def _get_autoupdate_pr(self):
+        pulls = self.fork.get_pulls(state='open', base=FOG_BASE, head=FOG_PR_BRANCH)
+        assert pulls.totalCount <= 1
+        if pulls.totalCount == 0:
+            return None
+        return pulls[0]
+
+    def create_or_update_pr(self, version):
+        title = f"Version {version}"
+        pr = self._get_autoupdate_pr()
+
+        if pr is not None:
+            print(f'updating pull-request title version to {version}')
+            pr.edit(title=f'Version {version}')
+        else:
+            print(f'creating pull-request from version {version}')
+            pr = self.fork.create_pull(
+                title=title,
+                body="Sync with the original repository",
+                base=f'{self.me}:{FOG_BASE}',
+                head=f'{self.me}:{FOG_PR_BRANCH}'
+            )
+            pr.set_labels(['autoupdate'])
 
 
 def _run(*args, **kwargs):
@@ -76,18 +174,6 @@ def _run(*args, **kwargs):
     return out
 
 
-def _load_version():
-    with open(MANIFEST_LOCATION, 'r') as f:
-        return json.load(f)['version']
-
-
-def _load_upstream_version():
-    url = f'https://raw.githubusercontent.com/{UPSTREAM_USER_REPO}/{config.RELEASE_BRANCH}/{MANIFEST_LOCATION}'
-    resp = urllib.request.urlopen(url)
-    upstream_manifest = json.loads(resp.read().decode('utf-8'))
-    return upstream_manifest['version']
-
-
 def _remove_items(paths):
     """Silently removes files or whole dir trees."""
     print('removing paths:', paths)
@@ -102,8 +188,8 @@ def _remove_items(paths):
                 raise
 
 
-def _fog_git_init(upstream=None):
-    origin = f'https://{FOG}:{_ENV_TOKEN}@github.com/{_ENV_REPOSITORY}.git'
+def _fog_git_init(token, repo, upstream=None):
+    origin = f'https://{FOG}:{token}@github.com/{repo}.git'
 
     _run(f'git config user.name {FOG}')
     _run(f'git config user.email {FOG_EMAIL}')
@@ -112,71 +198,42 @@ def _fog_git_init(upstream=None):
         _run(f'git remote add {UPSTREAM_REMOTE} {upstream}')
 
 
-def _is_pr_open():
-    url = f"https://api.github.com/repos/{_ENV_REPOSITORY}/pulls?base={FOG_BASE}&head={FOG}:{FOG_PR_BRANCH}&state=open"
-    resp = urllib.request.urlopen(url)
-    prs = json.loads(resp.read().decode('utf-8'))
-    if len(prs):
-        return True
-    return False
-
-
-def _create_pr():
-    version = _load_version()
-    print('preparing pull-request for version', version)
-    pr_title = f"Version {version}"
-    pr_message = "Sync with the original repository"
-    _run(
-        f'hub pull-request --base {FOG}:{FOG_BASE} --head {FOG}:{FOG_PR_BRANCH} '
-        f'-m "{pr_title}" -m "{pr_message}" --labels autoupdate'
-    )
-
-
-def _sync_pr():
-    """ Synchronize upstream changes to ORIGIN_REMOTE/FOG_PR_BRANCH
+def sync(api):
     """
-    _run(f'git fetch {UPSTREAM_REMOTE}')
+    Checks if there is new version (in manifest) on upstream.
+    If so, synchronize upstream changes to ORIGIN_REMOTE/FOG_PR_BRANCH
+    """
+    _fog_git_init(api.token, api.fork.full_name, upstream=api.parent.clone_url)
+    local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
 
-    try:
-        _run(f'git checkout -b {FOG_PR_BRANCH} --track {ORIGIN_REMOTE}/{FOG_PR_BRANCH}')
-    except subprocess.CalledProcessError:  # no such branch on remote
-        _run(f'git checkout -b {FOG_PR_BRANCH}')
-        _run(f'git push -u {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
+    # for now assume manifest location on remote does not changes in time (has the same place in our local fork and upstream)
+    upstream_ver = api.latest_parent_version(local_repo.manifest_path)
+    if StrictVersion(upstream_ver) <= StrictVersion(local_repo.version):
+        print(f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {local_repo.version}')
+        return
+
+    _run(f'git fetch {UPSTREAM_REMOTE}')
 
     print('removing reserved files')
     _remove_items(PATHS_TO_EXCLUDE)
 
-    print(f'merging latest release from {UPSTREAM_REMOTE}/{config.RELEASE_BRANCH}')
-    _run(f'git merge --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{config.RELEASE_BRANCH}')
+    print(f'merging latest release from {UPSTREAM_REMOTE}/{api.release_branch}')
+    _run(f'git merge --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
 
     print('checkout reserved files')
     _run(f'git checkout {ORIGIN_REMOTE}/{FOG_BASE} -- {" ".join(PATHS_TO_EXCLUDE)}')
 
+    print('commit and push')
     _run(f'git commit -m "Merge upstream"')
     _run(f'git push {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
 
-
-def sync():
-    """Started from master branch"""
-    _fog_git_init(config.UPSTREAM)
-
-    pr_branch_version = _load_version()
-    upstream_version = _load_upstream_version()
-    if StrictVersion(upstream_version) <= StrictVersion(pr_branch_version):
-        raise RuntimeError(
-            '====== No new version to be sync to. ' \
-            f'Upstream: {upstream_version}, fork {FOG_PR_BRANCH}: {pr_branch_version} ====='
-        )
-
-    _sync_pr()
-    if _is_pr_open():
-        print('creating PR skipped, as it already exists')
-    else:
-        _create_pr()
+    api.create_or_update_pr(local_repo.version)
 
 
-def build(output):
-    src = pathlib.Path(MANIFEST_DIR).resolve()
+def build(output, user_repo_name):
+    local_repo = LocalRepo()
+    src = local_repo.manifest_dir.resolve()
+
     outpath = pathlib.Path(output).resolve()
     try:
         outpath.relative_to(src)
@@ -201,7 +258,7 @@ def build(output):
         env["MACOSX_DEPLOYMENT_TARGET"] = "10.12"
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
-        _run(f'pip-compile {REQUIREMENTS_PATH} --output-file=-', stdout=tmp, stderr=subprocess.PIPE, capture_output=False)
+        _run(f'pip-compile {local_repo.requirements_path} --output-file=-', stdout=tmp, stderr=subprocess.PIPE, capture_output=False)
         _run('pip', 'install',
             '-r', tmp.name,
             '--platform', pip_platform,
@@ -220,10 +277,9 @@ def build(output):
         os.remove(test)
 
     print('add update_url entry in manifest')
-    with open(src / 'manifest.json', 'r') as f:
-        manifest = json.load(f)
-    manifest['update_url'] = UPDATE_URL
-    with open(output + '/manifest.json', 'w') as f:
+    manifest = local_repo.load_manifest()
+    manifest['update_url'] = f'https://raw.githubusercontent.com/{user_repo_name}/{FOG_BASE}/{RELEASE_FILE}'
+    with open(output / 'manifest.json', 'w') as f:
         json.dump(manifest, f, indent=4)
 
 
@@ -254,23 +310,24 @@ def release(build_dir):
         else:
             RuntimeError(f'No asset for {zip_name}!')
 
-    # Prepare assets
+    print('Preparing assets')
     asset_cmd = []
     _, _, filenames = next(os.walk(DIST_DIR))
     for filename in filenames:
         asset_cmd.append('-a')
         asset_cmd.append(str(pathlib.Path(DIST_DIR).absolute() / filename))
 
-    # Create and upload github tag and release with assets
-    version_tag = _load_version()
+    print('Creating tag and releasing on github with assets')
+    with open(pathlib.Path(build_dir) / 'manifest.json', 'r') as f:
+        version_tag = json.load(f)['version']
     _run('hub', 'release', 'create', version_tag,
         '-m', RELEASE_MESSAGE.format(tag=version_tag),
         *asset_cmd
     )
 
 
-def update_release_file():
-    version_tag = _load_version()
+def update_release_file(api):
+    version_tag = LocalRepo().version
 
     proc = _run(f'hub release show --show-downloads {version_tag}', text=True)
     lines = proc.stdout.split()
@@ -290,25 +347,38 @@ def update_release_file():
     with open(RELEASE_FILE, 'w') as f:
         json.dump(data, f, indent=4)
 
-    _fog_git_init()
+    _fog_git_init(api.token, api.fork.full_name)
 
     _run(f'git add {RELEASE_FILE}')
     _run(f'git commit -m "{RELEASE_FILE_COMMIT_MESSAGE}"')
     _run(f'git push {ORIGIN_REMOTE} HEAD:{FOG_BASE}')
 
 
-if __name__ == "__main__":
-    task = sys.argv[1]
+def main():
+    current_dir = pathlib.Path(os.getcwd()).name
+    default_repo = f'{FOG}/{current_dir}'
 
-    if task == 'release':
-        build_dir = sys.argv[2]
-        release(build_dir)
-    elif task == 'update_release_file':
-        update_release_file()
-    elif task == 'sync':
-        sync()
-    elif task == 'build':
-        build_dir = sys.argv[2]
-        build(build_dir)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('task', choices=['sync', 'build', 'release', 'update_release_file'])
+    parser.add_argument('--dir', required=sys.argv[1] in ['build', 'release'], help='build directory')
+    parser.add_argument('--token', default=os.environ.get('GITHUB_TOKEN'), help='github token with repo access')
+    parser.add_argument('--repo', default=default_repo, help='github_user/repository_name')
+
+    args = parser.parse_args()
+    if args.token:
+        frm = FogRepoManager(args.token, args.repo)
+
+    if args.task == 'sync':
+        sync(frm)
+    elif args.task == 'build':
+        build(args.dir, args.repo)
+    elif args.task == 'release':
+        release(args.dir)
+    elif args.task == 'update_release_file':
+        update_release_file(frm)
     else:
         raise RuntimeError(f'unknown command {task}')
+
+
+if __name__ == "__main__":
+    main()

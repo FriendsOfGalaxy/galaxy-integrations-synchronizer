@@ -29,10 +29,10 @@ jobs:
     - name: Build
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        REPOSITORY: ${{ github.repository }}
       run: |
         python -m pip install -U pip
         python -m pip install pip-tools
+        python -m pip install 'PyGithub==1.44'
         python ../scripts.py build ../build/${{ matrix.os }}
 
     - uses: actions/upload-artifact@master

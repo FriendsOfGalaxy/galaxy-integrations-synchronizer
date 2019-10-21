@@ -28,8 +28,9 @@ jobs:
     - name: Check and sync to PR
       env:
         GITHUB_TOKEN: ${{ secrets.PTOKEN }}
-        REPOSITORY: ${{ github.repository }}
-      run: python ../scripts.py sync
+      run: |
+        python -m pip install 'PyGithub==1.44'
+        python ../scripts.py sync
 
     # Temporal workaround for not working pull_request on forks:
     # https://github.community/t5/GitHub-Actions/Github-Workflow-not-running-from-pull-request-from-forked/m-p/33484/highlight/true#M1524
