@@ -12,6 +12,7 @@ class GitUserContext:
     def __init__(self, token, user, email):
         self.token = token
         self.user = user
+        self.commit_message = self._last_commit_message()
         self._run(f'git config --global user.email "{email}"')
         self._run(f'git config --global user.name "{user}Bot"')
 
@@ -24,6 +25,11 @@ class GitUserContext:
         proc = subprocess.run(cmd, **kwargs)
         print(proc.stdout)
         proc.check_returncode()
+        return proc
+
+    def _last_commit_message(self):
+        proc = self._run('git show -s --format=%B HEAD')
+        return proc.stdout.strip()
 
     def clone_repo(self, repo):
         self._run(f'git clone https://{self.user}:{self.token}@github.com/{self.user}/{repo}.git')
@@ -33,7 +39,7 @@ class GitUserContext:
         target = os.path.join(repo, '.github', 'workflows')
         for file_ in glob.glob(r'templates/.github/workflows/*.yml'):
             shutil.copy(file_, target)
-        self._run(f'git commit -a -m "Workflows autoupdate"', cwd=repo)
+        self._run(f'git commit -a -m "{self.commit_message}"', cwd=repo)
         self._run(f'git push origin master', cwd=repo)
 
 
