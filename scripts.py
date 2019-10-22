@@ -35,6 +35,25 @@ ORIGIN_REMOTE = 'origin'
 PATHS_TO_EXCLUDE = ['README.md', '.github/', RELEASE_FILE]
 
 
+def _run(*args, **kwargs):
+    cmd = list(args)
+    if len(cmd) == 1:
+        cmd = shlex.split(cmd[0])
+    kwargs.setdefault("capture_output", True)
+    kwargs.setdefault("text", True)
+    print('executing', cmd)
+    out = subprocess.run(cmd, **kwargs)
+    try:
+        out.check_returncode()
+    except subprocess.CalledProcessError as e:
+        err_str = f'{e.output}\n{e.stderr}'
+        print('><', err_str)
+        raise
+    else:
+        print('>>', out.stdout)
+    return out
+
+
 class LocalRepo:
     MANIFEST = 'manifest.json'
     REQUIREMENTS = 'requirements.txt'
@@ -155,25 +174,6 @@ class FogRepoManager:
             pr.set_labels(['autoupdate'])
 
 
-def _run(*args, **kwargs):
-    cmd = list(args)
-    if len(cmd) == 1:
-        cmd = shlex.split(cmd[0])
-    kwargs.setdefault("capture_output", True)
-    kwargs.setdefault("text", True)
-    print('executing', cmd)
-    out = subprocess.run(cmd, **kwargs)
-    try:
-        out.check_returncode()
-    except subprocess.CalledProcessError as e:
-        err_str = f'{e.output}\n{e.stderr}'
-        print('><', err_str)
-        raise
-    else:
-        print('>>', out.stdout)
-    return out
-
-
 def _remove_items(paths):
     """Silently removes files or whole dir trees."""
     print('removing paths:', paths)
@@ -279,7 +279,7 @@ def build(output, user_repo_name):
     print('add update_url entry in manifest')
     manifest = local_repo.load_manifest()
     manifest['update_url'] = f'https://raw.githubusercontent.com/{user_repo_name}/{FOG_BASE}/{RELEASE_FILE}'
-    with open(output / 'manifest.json', 'w') as f:
+    with open(outpath / 'manifest.json', 'w') as f:
         json.dump(manifest, f, indent=4)
 
 
