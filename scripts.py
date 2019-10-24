@@ -215,12 +215,14 @@ def sync(api):
     """
     _fog_git_init(api.token, api.fork.full_name, upstream=api.parent.clone_url)
     local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
+    initial_merge = False
 
     upstream_ver = api.get_parent_manifest()['version']
     try:
         local_version = local_repo.get_local_version()
     except FileNotFoundError:
-        print('No local version - probably first PR. Going on.')
+        print('No local version - assuming it is initial PR. Going on.')
+        initial_merge = True
     else:
         if StrictVersion(upstream_ver) <= StrictVersion(local_version):
             print(f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {local_version}')
@@ -232,7 +234,10 @@ def sync(api):
     _remove_items(PATHS_TO_EXCLUDE)
 
     print(f'merging latest release from {UPSTREAM_REMOTE}/{api.release_branch}')
-    _run(f'git merge --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
+    if initial_merge:
+        _run(f'git merge --allow-unrelated-histories --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
+    else:
+        _run(f'git merge --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
 
     print('checkout reserved files')
     _run(f'git checkout {ORIGIN_REMOTE}/{FOG_BASE} -- {" ".join(PATHS_TO_EXCLUDE)}')
