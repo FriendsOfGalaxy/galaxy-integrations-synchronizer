@@ -240,7 +240,11 @@ def sync(api):
         _run(f'git merge --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
 
     print('checkout reserved files')
-    _run(f'git checkout {ORIGIN_REMOTE}/{FOG_BASE} -- {" ".join(PATHS_TO_EXCLUDE)}')
+    for path in PATHS_TO_EXCLUDE:
+        try:
+            _run(f'git checkout {ORIGIN_REMOTE}/{FOG_BASE} -- {path}')
+        except subprocess.CalledProcessError:
+            print(f'Warning: Cannot checkout {path} from remote {FOG_BASE}')
 
     print('commit and push')
     _run(f'git commit -m "Merge upstream"')
