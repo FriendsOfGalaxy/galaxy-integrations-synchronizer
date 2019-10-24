@@ -78,9 +78,10 @@ class LocalRepo:
         for root, dirs, files in os.walk('.'):
             if self.MANIFEST in files:
                 return root
+        raise FileNotFoundError('No manifest in local repository')
 
     def load_manifest(self):
-        with open(self._manifest_dir / self.MANIFEST, 'r') as f:
+        with open(self.manifest_dir / self.MANIFEST, 'r') as f:
             self._manifest = json.load(f)
         return self._manifest.copy()
 
@@ -98,8 +99,7 @@ class LocalRepo:
         """Requirements file is required to be placed in root"""
         return pathlib.Path(self.REQUIREMENTS)
 
-    @property
-    def version(self):
+    def get_local_version(self):
         if self._manifest is None:
             self.load_manifest()
         return self._manifest['version']
@@ -216,11 +216,15 @@ def sync(api):
     _fog_git_init(api.token, api.fork.full_name, upstream=api.parent.clone_url)
     local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
 
-    # for now assume manifest location on remote does not changes in time (has the same place in our local fork and upstream)
     upstream_ver = api.get_parent_manifest()['version']
-    if StrictVersion(upstream_ver) <= StrictVersion(local_repo.version):
-        print(f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {local_repo.version}')
-        return
+    try:
+        local_version = local_repo.get_local_version()
+    except FileNotFoundError:
+        print('No local version - probably first PR. Going on.')
+    else:
+        if StrictVersion(upstream_ver) <= StrictVersion(local_version):
+            print(f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {local_version}')
+            return
 
     _run(f'git fetch {UPSTREAM_REMOTE}')
 
@@ -237,7 +241,7 @@ def sync(api):
     _run(f'git commit -m "Merge upstream"')
     _run(f'git push {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
 
-    api.create_or_update_pr(local_repo.version)
+    api.create_or_update_pr(upstream_ver)
 
 
 def build(output, user_repo_name):
