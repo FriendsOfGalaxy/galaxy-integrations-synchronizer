@@ -16,8 +16,6 @@ from distutils.dir_util import copy_tree
 from distutils.file_util import copy_file
 from distutils.version import StrictVersion
 
-# pip install PyGithub
-from github import Github
 import github
 
 FOG = 'FriendsOfGalaxy'
@@ -59,12 +57,13 @@ class LocalRepo:
     REQUIREMENTS = 'requirements.txt'
 
     def __init__(self, branch=None, check_requirements=True):
+        self._manifest_dir = None
+        self._manifest = None
+
         if branch is not None and branch != self.current_branch:
             self._checkout(branch)
         if check_requirements:
             assert self.requirements_path.exists()
-        self._manifest_dir = pathlib.Path(self._localize_manifest_dir())
-        self._manifest = None
 
     @staticmethod
     def _checkout(branch):
@@ -107,7 +106,9 @@ class LocalRepo:
 
     @property
     def manifest_dir(self):
-        return self._manifest_dir
+        if self._manifest is None:
+            self._manifest = pathlib.Path(self._localize_manifest_dir())
+        return self._manifest_dir.resolve()
 
 
 class FogRepoManager:
@@ -118,13 +119,12 @@ class FogRepoManager:
         self.token = token
         self.fork = github.Github(token).get_repo(fork_repo)
         self.parent = self.fork.parent
-
-    @property
-    def me(self):
-        return self.fork.owner.login
+        self._release_branch = None
 
     @property
     def release_branch(self):
+        if self._release_branch is not None:
+            return self._release_branch
         try:
             return self.parent.get_branch(self.FOG_RELEASE).name
         except github.GithubException as e:
@@ -136,19 +136,29 @@ class FogRepoManager:
     def upstream_user_name(self):
         return self.parent.full_name
 
-    def latest_parent_version(self, manifest_location):
-        if not str(manifest_location).startswith('/'):
-            manifest_location = '/' + str(manifest_location)
-        release_branch = self.release_branch
-        print(f'Looking for {manifest_location} in {self.parent.full_name}, branch: {release_branch}')
-        m_file = self.parent.get_contents(manifest_location, ref=release_branch)
-        if type(m_file) == list:
-            raise RuntimeError(f'Manifest not found in {manifest_location}! Maybe it has been moved?')
-        manifest = json.loads(m_file.decoded_content)
-        print(manifest)
-        return manifest['version']
+    def _iterate_files(self, repo, ref, dir_):
+        """BFS walk through parent repo files using github API
+        :dir_: str or github.ContentFile.ContentFile
+        """
+        if isinstance(dir_, github.ContentFile.ContentFile):
+            dir_ = dir_.path
 
-    # def is_autoupdate_pr_open(self):
+        dirs = []
+        for it in repo.get_contents(dir_, ref=ref):
+            if it.type == 'dir':
+                dirs.append(it)
+            else:
+                yield it
+        for d in dirs:
+            yield from self._iterate_files(repo, ref, d)
+
+    def get_parent_manifest(self):
+        for it in self._iterate_files(self.parent, self.release_branch, '/'):
+            if it.name == 'manifest.json':
+                print(f'Found manifest.json in location: {it.path}')
+                return json.loads(it.decoded_content)
+        raise RuntimeError('manifest.json not found in parent repository!')
+
     def _get_autoupdate_pr(self):
         pulls = self.fork.get_pulls(state='open', base=FOG_BASE, head=FOG_PR_BRANCH)
         assert pulls.totalCount <= 1
@@ -168,8 +178,8 @@ class FogRepoManager:
             pr = self.fork.create_pull(
                 title=title,
                 body="Sync with the original repository",
-                base=f'{self.me}:{FOG_BASE}',
-                head=f'{self.me}:{FOG_PR_BRANCH}'
+                base=f'{FOG}:{FOG_BASE}',
+                head=f'{FOG}:{FOG_PR_BRANCH}'
             )
             pr.set_labels(['autoupdate'])
 
@@ -207,7 +217,7 @@ def sync(api):
     local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
 
     # for now assume manifest location on remote does not changes in time (has the same place in our local fork and upstream)
-    upstream_ver = api.latest_parent_version(local_repo.manifest_path)
+    upstream_ver = api.get_parent_manifest()['version']
     if StrictVersion(upstream_ver) <= StrictVersion(local_repo.version):
         print(f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {local_repo.version}')
         return
@@ -367,6 +377,8 @@ def main():
     args = parser.parse_args()
     if args.token:
         frm = FogRepoManager(args.token, args.repo)
+    else:
+        print('GITHUB_TOKEN not found')
 
     if args.task == 'sync':
         sync(frm)
