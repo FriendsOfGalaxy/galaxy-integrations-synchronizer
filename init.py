@@ -1,5 +1,6 @@
 import os
 import argparse
+import json
 import sys
 import pathlib
 
@@ -56,7 +57,7 @@ def fork_repo(token: str, repo_name: str) -> github.Repository.Repository:
     Forks repository if not already forked. Returns our fork.
     """
     g = github.Github(token)
-    fog_user = g.get_user(FOG)
+    fog_user = g.get_user()
 
     original_repo = g.get_repo(repo_name)
     for fork in original_repo.get_forks():
@@ -64,7 +65,7 @@ def fork_repo(token: str, repo_name: str) -> github.Repository.Repository:
             break
     else:
         print(f'{repo_name} is not forked yet. Let us fork!')
-        fork = fog_user.create_fork(repo_name)
+        fork = fog_user.create_fork(original_repo)
     return fork
 
 
@@ -103,4 +104,6 @@ if __name__ == "__main__":
     edit_metadata(man)
     add_to_synced(fork.name)
     if args.purge:
-        purge_content(man)
+        msg = 'Unreversable decision. Are you sure you want to remove all the content, all branches and releases from this repository?'
+        if input(f"{msg} (y/N)? ").lower() == 'y':
+            purge_content(man)

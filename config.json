@@ -2,6 +2,7 @@
     "forks_to_sync": [
         "test-integration-fork",
         "galaxy-integration-bethesda",
-        "galaxy-integration-rockstar"
+        "galaxy-integration-rockstar",
+        "galaxy-integration-gw2"
     ]
 }

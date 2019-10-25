@@ -63,7 +63,7 @@ class LocalRepo:
         if branch is not None and branch != self.current_branch:
             self._checkout(branch)
         if check_requirements:
-            assert self.requirements_path.exists()
+            assert self.requirements_path.exists(), f"No /requirements.txt on {current_branch}"
 
     @staticmethod
     def _checkout(branch):
