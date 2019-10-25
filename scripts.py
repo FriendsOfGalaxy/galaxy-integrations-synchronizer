@@ -178,10 +178,10 @@ class FogRepoManager:
             pr = self.fork.create_pull(
                 title=title,
                 body="Sync with the original repository",
-                base=f'{FOG}:{FOG_BASE}',
-                head=f'{FOG}:{FOG_PR_BRANCH}'
+                base=FOG_BASE,
+                head=FOG_PR_BRANCH
             )
-            pr.set_labels(['autoupdate'])
+            pr.set_labels('autoupdate')
 
 
 def _remove_items(paths):
