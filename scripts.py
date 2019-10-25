@@ -106,8 +106,8 @@ class LocalRepo:
 
     @property
     def manifest_dir(self):
-        if self._manifest is None:
-            self._manifest = pathlib.Path(self._localize_manifest_dir())
+        if self._manifest_dir is None:
+            self._manifest_dir = pathlib.Path(self._localize_manifest_dir())
         return self._manifest_dir.resolve()
 
 
