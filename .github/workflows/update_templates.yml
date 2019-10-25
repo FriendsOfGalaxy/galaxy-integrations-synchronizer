@@ -19,4 +19,4 @@ jobs:
     - name: Run update_forks.py
       env:
         GITHUB_TOKEN: ${{ secrets.PTOKEN }}
-      run: python update_workflows.py
+      run: python update_templates.py
