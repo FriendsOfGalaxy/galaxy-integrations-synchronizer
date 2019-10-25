@@ -63,7 +63,7 @@ class LocalRepo:
         if branch is not None and branch != self.current_branch:
             self._checkout(branch)
         if check_requirements:
-            assert self.requirements_path.exists(), f"No /requirements.txt on {current_branch}"
+            assert self.requirements_path.exists(), f"No /requirements.txt on {self.current_branch}"
 
     @staticmethod
     def _checkout(branch):
@@ -225,8 +225,9 @@ def sync(api):
         initial_merge = True
     else:
         if StrictVersion(upstream_ver) <= StrictVersion(local_version):
-            print(f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {local_version}')
-            return
+            msg = f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {local_version}'
+            raise RuntimeError(msg)
+
 
     _run(f'git fetch {UPSTREAM_REMOTE}')
 
