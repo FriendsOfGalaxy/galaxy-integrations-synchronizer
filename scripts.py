@@ -273,13 +273,10 @@ def build(output, user_repo_name):
     to_ignore = shutil.ignore_patterns(RELEASE_FILE, '.*', 'test_*.py', '*_test.py', '*.pyc')
     shutil.copytree(src, output, ignore=to_ignore)
 
-    env = os.environ.copy()
     if sys.platform == "win32":
         pip_platform = "win32"
     elif sys.platform == "darwin":
         pip_platform = "macosx_10_12_x86_64"
-        # making sure to work on macos 10.12 in case of building from sources
-        env["MACOSX_DEPLOYMENT_TARGET"] = "10.12"
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
         _run(f'pip-compile {local_repo.requirements_path} --output-file=-', stdout=tmp, stderr=subprocess.PIPE, capture_output=False)
@@ -289,8 +286,7 @@ def build(output, user_repo_name):
             '--target', output,
             '--python-version', '37',
             '--no-compile',
-            '--no-deps',
-            env=env
+            '--no-deps'
         )
     os.unlink(tmp.name)
 
