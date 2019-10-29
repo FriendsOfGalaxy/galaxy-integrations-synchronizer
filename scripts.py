@@ -218,13 +218,14 @@ def sync(api):
     initial_merge = False
 
     upstream_ver = api.get_parent_manifest()['version']
+    strict_upstream_ver = StrictVersion(upstream_ver)  # raise exception if not proper basic semver
     try:
         local_version = local_repo.get_local_version()
     except FileNotFoundError:
         print('No local version - assuming it is initial PR. Going on.')
         initial_merge = True
     else:
-        if StrictVersion(upstream_ver) <= StrictVersion(local_version):
+        if strict_upstream_ver <= StrictVersion(local_version):
             msg = f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {local_version}'
             raise RuntimeError(msg)
 
@@ -387,8 +388,8 @@ def main():
     args = parser.parse_args()
     if args.token:
         frm = FogRepoManager(args.token, args.repo)
-    else:
-        print('GITHUB_TOKEN not found')
+        if args.task in ['sync', 'update_release_file']:
+            raise RuntimeError('Github token not found. Have you set it in secrets?')
 
     if args.task == 'sync':
         sync(frm)

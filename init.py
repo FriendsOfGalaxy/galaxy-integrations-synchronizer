@@ -20,8 +20,9 @@ def edit_metadata(man: FogRepoManager):
     name = 'galaxy-integration-' + manifest['platform']
     description = "In case of any issues please refer to the original repository:"
     homepage = man.fork.parent.html_url
-    print('== editing repo metadata:', name, description, homepage)
+    print(f'== editing repo metadata:\nname="{name}", desc="{description}", homepage="{homepage}"')
     man.fork.edit(name, description, homepage, has_issues=False, allow_squash_merge=False)
+    return name
 
 
 def purge_content(man: FogRepoManager):
@@ -45,7 +46,7 @@ def purge_content(man: FogRepoManager):
         for branch in man.fork.get_branches():
             if branch.name == man.fork.default_branch:
                 continue
-            c.run(f'git push github --delete {branch.name}')
+            c.run(f'git push --delete origin {branch.name}')
 
         print('== deleting tags')
         for tag in man.fork.get_tags():
@@ -73,11 +74,12 @@ def add_to_synced(fork_name: str):
     """
     Adds FoG fork repo to config.json
     """
+    print('=== adding to sync config')
     SYNC_CONFIG_PATH = os.path.join('config.json')
     with open(SYNC_CONFIG_PATH, 'r+') as f:
         config = json.load(f)
         if fork_name in config['forks_to_sync']:
-            print('Already in sync config')
+            print('=== already added')
             return
         config['forks_to_sync'].append(fork_name)
         f.seek(0)
@@ -97,12 +99,12 @@ if __name__ == "__main__":
     try:
         token = os.environ['FOG_GITHUB_TOKEN']
     except KeyError:
-        print('FOG_GITHUB_TOKEN required as environmental variable')
+        raise RuntimeError('FOG_GITHUB_TOKEN required as environmental variable')
 
     fork = fork_repo(token, args.repo)
     man = FogRepoManager(token, fork.full_name)
-    edit_metadata(man)
-    add_to_synced(fork.name)
+    updated_repo_name = edit_metadata(man)
+    add_to_synced(updated_repo_name)
     if args.purge:
         msg = 'Unreversable decision. Are you sure you want to remove all the content, all branches and releases from this repository?'
         if input(f"{msg} (y/N)? ").lower() == 'y':
