@@ -24,7 +24,6 @@ FOG_EMAIL = 'FriendsOfGalaxy@gmail.com'
 RELEASE_MESSAGE = "Release version {tag}\n\nVersion {tag}"
 RELEASE_FILE ="current_version.json"
 RELEASE_FILE_COMMIT_MESSAGE = "Updated current_version.json"
-DIST_DIR = os.path.join('..', 'assets')
 
 FOG_BASE = 'master'
 FOG_PR_BRANCH = 'autoupdate'
@@ -305,42 +304,46 @@ def build(output, user_repo_name):
 
 
 def release(build_dir):
-    """Zips dirs given in build_dir and upload them as github release
+    """Zips dirs given in build_dir and upload them with newly created github release
     build_dir should contain asset for windows and/or macos.
-    Asset names should start with windows or macos (case insensitive)
+    Asset names should start with 'windows' or 'macos' (case insensitive)
     """
+
     asset_dirs = os.listdir(build_dir)
-    print(asset_dirs)
+    print('asset_dirs', asset_dirs)
     if not asset_dirs:
         raise RuntimeError(f'No assets found in {build_dir}')
 
-    # Remove assets dir
-    if os.path.exists(DIST_DIR):
-        shutil.rmtree(DIST_DIR)
-    os.makedirs(DIST_DIR)
+    zip_assets_dir = os.path.join('..', 'assets')
+    print(f"Clearning content of {zip_assets_dir}")
+    if os.path.exists(zip_assets_dir):
+        shutil.rmtree(zip_assets_dir)
+    os.makedirs(zip_assets_dir)
 
-    # Zip build assets
+    print(f"Zipping artifacts to {zip_assets_dir}")
     zip_names = {'windows', 'macos'}
     for zip_name in zip_names:
         for asset_dir in asset_dirs:
             if asset_dir.lower().startswith(zip_name):
                 src = os.path.join(build_dir, asset_dir)
-                asset = os.path.join(DIST_DIR, zip_name)
+                asset = os.path.join(zip_assets_dir, zip_name)
                 shutil.make_archive(asset, 'zip', root_dir=src, base_dir='.')
                 break
         else:
             RuntimeError(f'No asset for {zip_name}!')
 
-    print('Preparing assets')
+    print(f'Preparing command for adding assets from {zip_assets_dir}')
     asset_cmd = []
-    _, _, filenames = next(os.walk(DIST_DIR))
+    filenames = os.listdir(zip_assets_dir)
     for filename in filenames:
         asset_cmd.append('-a')
-        asset_cmd.append(str(pathlib.Path(DIST_DIR).absolute() / filename))
+        path = str(pathlib.Path(zip_assets_dir).absolute() / filename)
+        print('=== found zip: ', path)
+        asset_cmd.append(path)
 
-    print('Creating tag and releasing on github with assets')
-    with open(pathlib.Path(build_dir) / 'manifest.json', 'r') as f:
-        version_tag = json.load(f)['version']
+    version_tag = LocalRepo().get_local_version()
+
+    print(f'Creating tag {version_tag} and releasing on github with assets')
     _run('hub', 'release', 'create', version_tag,
         '-m', RELEASE_MESSAGE.format(tag=version_tag),
         *asset_cmd
@@ -386,19 +389,21 @@ def main():
     parser.add_argument('--repo', default=default_repo, help='github_user/repository_name')
 
     args = parser.parse_args()
-    if args.token:
-        frm = FogRepoManager(args.token, args.repo)
-    elif args.task in ['sync', 'update_release_file']:
+
+    if args.task == 'build':
+        build(args.dir, args.repo)
+        return
+
+    if not args.token:
         raise RuntimeError('Github token not found. Have you set it in secrets?')
+    man = FogRepoManager(args.token, args.repo)
 
     if args.task == 'sync':
-        sync(frm)
-    elif args.task == 'build':
-        build(args.dir, args.repo)
+        sync(man)
     elif args.task == 'release':
         release(args.dir)
     elif args.task == 'update_release_file':
-        update_release_file(frm)
+        update_release_file(man)
     else:
         raise RuntimeError(f'unknown command {task}')
 
