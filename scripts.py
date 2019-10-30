@@ -348,7 +348,7 @@ def release(build_dir):
 
 
 def update_release_file(api):
-    version_tag = LocalRepo().version
+    version_tag = LocalRepo().get_local_version()
 
     proc = _run(f'hub release show --show-downloads {version_tag}', text=True)
     lines = proc.stdout.split()
