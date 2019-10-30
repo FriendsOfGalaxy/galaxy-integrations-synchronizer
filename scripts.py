@@ -388,8 +388,8 @@ def main():
     args = parser.parse_args()
     if args.token:
         frm = FogRepoManager(args.token, args.repo)
-        if args.task in ['sync', 'update_release_file']:
-            raise RuntimeError('Github token not found. Have you set it in secrets?')
+    elif args.task in ['sync', 'update_release_file']:
+        raise RuntimeError('Github token not found. Have you set it in secrets?')
 
     if args.task == 'sync':
         sync(frm)
