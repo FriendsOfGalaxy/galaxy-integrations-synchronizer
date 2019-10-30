@@ -91,7 +91,7 @@ class LocalRepo:
 
     @property
     def manifest_path(self):
-        return self._manifest_dir / self.MANIFEST
+        return self.manifest_dir / self.MANIFEST
 
     @property
     def requirements_path(self):
@@ -228,7 +228,6 @@ def sync(api):
             msg = f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {local_version}'
             raise RuntimeError(msg)
 
-
     _run(f'git fetch {UPSTREAM_REMOTE}')
 
     print('removing reserved files')
@@ -246,6 +245,18 @@ def sync(api):
             _run(f'git checkout {ORIGIN_REMOTE}/{FOG_BASE} -- {path}')
         except subprocess.CalledProcessError:
             print(f'Warning: Cannot checkout {path} from remote {FOG_BASE}')
+
+    # new instance of LocalRepo to re-search for manifest.json in case the plugin structure has changed
+    new_repo = LocalRepo()
+
+    print('adding update_url in manifest.json')
+    with open(new_repo.manifest_path, 'r+') as f:
+        manifest = json.load(f)
+        manifest['update_url'] = f'https://raw.githubusercontent.com/{api.fork.full_name}/master/current_version.json'
+        f.seek(0)
+        json.dump(manifest, f, indent=4)
+    print(json.dumps(manifest, indent=4))
+    _run(f'git add {new_repo.manifest_path}')
 
     print('commit and push')
     _run(f'git commit -m "Merge upstream"')
