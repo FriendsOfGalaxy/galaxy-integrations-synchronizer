@@ -53,7 +53,8 @@ def _run(*args, **kwargs):
 
 class LocalRepo:
     MANIFEST = 'manifest.json'
-    REQUIREMENTS = 'requirements.txt'
+    REQUIREMENTS = os.path.join('requirements', 'app.txt')
+    REQUIREMENTS_LEGACY = 'requirements.txt'
 
     def __init__(self, branch=None, check_requirements=True):
         self._manifest_dir = None
@@ -62,7 +63,7 @@ class LocalRepo:
         if branch is not None and branch != self.current_branch:
             self._checkout(branch)
         if check_requirements:
-            assert self.requirements_path.exists(), f"No /requirements.txt on {self.current_branch}"
+            assert self.requirements_path.exists(), f"No requirements file found on {self.current_branch}"
 
     @staticmethod
     def _checkout(branch):
@@ -95,8 +96,10 @@ class LocalRepo:
 
     @property
     def requirements_path(self):
-        """Requirements file is required to be placed in root"""
-        return pathlib.Path(self.REQUIREMENTS)
+        req = pathlib.Path(self.REQUIREMENTS)
+        if not req.exists():
+            req = pathlib.Path(self.REQUIREMENTS_LEGACY)
+        return req
 
     def get_local_version(self):
         if self._manifest is None:
