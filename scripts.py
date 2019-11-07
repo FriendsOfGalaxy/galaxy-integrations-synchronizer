@@ -246,18 +246,6 @@ def sync(api):
         except subprocess.CalledProcessError:
             print(f'Warning: Cannot checkout {path} from remote {FOG_BASE}')
 
-    # new instance of LocalRepo to re-search for manifest.json in case the plugin structure has changed
-    new_repo = LocalRepo()
-
-    print('adding update_url in manifest.json')
-    with open(new_repo.manifest_path, 'r+') as f:
-        manifest = json.load(f)
-        manifest['update_url'] = f'https://raw.githubusercontent.com/{api.fork.full_name}/master/current_version.json'
-        f.seek(0)
-        json.dump(manifest, f, indent=4)
-    print(json.dumps(manifest, indent=4))
-    _run(f'git add {new_repo.manifest_path}')
-
     print('commit and push')
     _run(f'git commit -m "Merge upstream"')
     _run(f'git push {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
