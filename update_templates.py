@@ -10,9 +10,18 @@ from context import UserRepoContext
 from scripts import FogRepoManager, FOG
 
 
-def dump_readme(repo_dir, title, url):
+def dump_readme(repo_dir, man: FogRepoManager):
+    title = man.fork.name
+    url = man.parent.html_url
+    license_type = man.get_parent_license().key
+    if license_type == 'mit':
+        cp = ''
+    else:
+        owner = man.parent.owner
+        cp = f'Copyright {man.parent.created_at.year} [{owner.name}]({owner.html_url})'
+
     with open(os.path.join('templates', 'README.md'), 'r') as f:
-        readme = f.read().format(title=title, url=url)
+        readme = f.read().format(title=title, url=url, copyright=cp)
         with open(os.path.join(repo_dir, 'README.md'), 'w') as g:
             g.write(readme)
 
@@ -39,6 +48,6 @@ if __name__ == "__main__":
         with UserRepoContext(tkn, FOG, 'FriendsOfGalaxy+bot@gmail.com', repo_name) as c:
             print('> copying workflow files')
             copy_workflows(repo_dir=c.cwd)
-            dump_readme(repo_dir=c.cwd, title=repo_name, url=man.parent.html_url)
+            dump_readme(repo_dir=c.cwd, man=man)
             c.run(f'git commit -a -m "{last_commit_msg}"')
             c.run(f'git push origin master')

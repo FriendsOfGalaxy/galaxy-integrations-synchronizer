@@ -113,6 +113,7 @@ class LocalRepo:
 class FogRepoManager:
     """Will eventually replace CLI Hub tool"""
     FOG_RELEASE = 'fog_release'
+    ALLOWED_LICENSES = ['mit', 'gpl-3.0']
 
     def __init__(self, token, fork_repo):
         self.token = token
@@ -182,6 +183,11 @@ class FogRepoManager:
             )
             pr.set_labels('autoupdate')
 
+    def get_parent_license(self) -> github.License.License:
+        lic = self.parent.get_license().license
+        if lic.key not in self.ALLOWED_LICENSES:
+            raise ValueError(f'{lic} license is not supported.')
+        return lic
 
 def _remove_items(paths):
     """Silently removes files or whole dir trees."""
@@ -416,7 +422,7 @@ def main():
     elif args.task == 'update_release_file':
         update_release_file(man)
     else:
-        raise RuntimeError(f'unknown command {task}')
+        raise RuntimeError(f'unknown command {args.task}')
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ def purge_content(man: FogRepoManager):
     print('== initialize new github repo and force push with only our template files')
     with UserRepoContext(man.token, FOG, FOG_EMAIL, man.fork.name, clone=False) as c:
         copy_workflows(repo_dir=c.cwd)
-        dump_readme(repo_dir=c.cwd, title=man.fork.name, url=man.parent.html_url)
+        dump_readme(repo_dir=c.cwd, man=man)
         c.run(f'git add .')
         c.run(f'git commit -m "Reset repository"')
         c.run(f'git push -u --force origin master')
