@@ -281,7 +281,7 @@ def build(output, user_repo_name):
         pip_platform = "macosx_10_12_x86_64"
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
-        _run(f'pip-compile {local_repo.requirements_path} --output-file=-', stdout=tmp, stderr=subprocess.PIPE, capture_output=False)
+        _run(f'pip-compile {local_repo.requirements_path.as_posix()} --output-file=-', stdout=tmp, stderr=subprocess.PIPE, capture_output=False)
         _run('pip', 'install',
             '-r', tmp.name,
             '--platform', pip_platform,

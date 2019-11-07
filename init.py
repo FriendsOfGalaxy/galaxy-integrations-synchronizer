@@ -82,7 +82,7 @@ def add_to_synced(fork_name: str):
             print('=== already added')
             return
         config['forks_to_sync'].append(fork_name)
-        f.seek(0)
+        f.truncate(0)
         json.dump(config, f, indent=4)
 
 
