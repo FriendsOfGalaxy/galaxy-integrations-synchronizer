@@ -221,7 +221,7 @@ def sync(api):
     Checks if there is new version (in manifest) on upstream.
     If so, synchronize upstream changes to ORIGIN_REMOTE/FOG_PR_BRANCH
     """
-    api.get_parent_manifest()  # verify if supported license exists
+    api.get_parent_license()  # verify if supported license exists
 
     _fog_git_init(api.token, api.fork.full_name, upstream=api.parent.clone_url)
     local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
