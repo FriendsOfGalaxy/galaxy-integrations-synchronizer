@@ -116,6 +116,7 @@ class LocalRepo:
 class FogRepoManager:
     """Will eventually replace CLI Hub tool"""
     FOG_RELEASE = 'fog_release'
+    ALLOWED_LICENSES = ['mit', 'gpl-3.0']
 
     def __init__(self, token, fork_repo):
         self.token = token
@@ -185,6 +186,14 @@ class FogRepoManager:
             )
             pr.set_labels('autoupdate')
 
+    def get_parent_license(self) -> github.License.License:
+        try:
+            lic = self.parent.get_license().license
+        except github.UnknownObjectException as e:
+            raise ValueError(f'Error while getting license: {e}')
+        if lic.key not in self.ALLOWED_LICENSES:
+            raise ValueError(f'{lic} license is not supported.')
+        return lic
 
 def _remove_items(paths):
     """Silently removes files or whole dir trees."""
@@ -215,6 +224,8 @@ def sync(api):
     Checks if there is new version (in manifest) on upstream.
     If so, synchronize upstream changes to ORIGIN_REMOTE/FOG_PR_BRANCH
     """
+    api.get_parent_license()  # verify if supported license exists
+
     _fog_git_init(api.token, api.fork.full_name, upstream=api.parent.clone_url)
     local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
     initial_merge = False
@@ -407,7 +418,7 @@ def main():
     elif args.task == 'update_release_file':
         update_release_file(man)
     else:
-        raise RuntimeError(f'unknown command {task}')
+        raise RuntimeError(f'unknown command {args.task}')
 
 
 if __name__ == "__main__":

@@ -44,13 +44,13 @@ class UserRepoContext:
         shutil.rmtree(self._tmpdir, onerror=del_ro)
 
     def run(self, cmd: str, **kwargs):
-        cmd = shlex.split(cmd)
+        cmd_ = shlex.split(cmd)
         kwargs.setdefault("stdout", subprocess.PIPE)
         kwargs.setdefault("stderr", subprocess.STDOUT)
         kwargs.setdefault("text", True)
         kwargs.setdefault("cwd", self._cwd)
-        print(f'-- executing {cmd}, cwd={kwargs["cwd"]}')
-        proc = subprocess.run(cmd, **kwargs)
+        print(f'-- executing {cmd_}, cwd={kwargs["cwd"]}')
+        proc = subprocess.run(cmd_, **kwargs)
         print(proc.stdout)
         proc.check_returncode()
         return proc
