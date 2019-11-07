@@ -221,26 +221,32 @@ def _fog_git_init(token, repo, upstream=None):
 
 def sync(api):
     """
-    Checks if there is new version (in manifest) on upstream.
+    Checks if there is new version (in manifest) on upstream versus current master.
     If so, synchronize upstream changes to ORIGIN_REMOTE/FOG_PR_BRANCH
     """
-    api.get_parent_license()  # verify if supported license exists
-
     _fog_git_init(api.token, api.fork.full_name, upstream=api.parent.clone_url)
-    local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
-    initial_merge = False
 
+    # verify license
+    api.get_parent_license()
+    # verify upstream version
     upstream_ver = api.get_parent_manifest()['version']
-    strict_upstream_ver = StrictVersion(upstream_ver)  # raise exception if not proper basic semver
+    strict_upstream_ver = StrictVersion(upstream_ver)
+
+    # Comparing master version with upstream
+    local_repo = LocalRepo(branch=FOG_BASE, check_requirements=False)
+    initial_merge = False
     try:
-        local_version = local_repo.get_local_version()
+        master_version = StrictVersion(local_repo.get_local_version())
     except FileNotFoundError:
         print('No local version - assuming it is initial PR. Going on.')
         initial_merge = True
     else:
-        if strict_upstream_ver <= StrictVersion(local_version):
-            msg = f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {local_version}'
+        if strict_upstream_ver <= master_version:
+            msg = f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {master_version}'
             raise RuntimeError(msg)
+
+    # switching to autoupdate
+    local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
 
     _run(f'git fetch {UPSTREAM_REMOTE}')
 
