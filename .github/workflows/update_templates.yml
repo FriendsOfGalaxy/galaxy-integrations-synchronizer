@@ -6,7 +6,7 @@ on:
     branches:
     - master
     paths:
-    - 'templates/.github/workflows/*.yml'
+    - 'templates/**'
 
 jobs:
   update_templates:
