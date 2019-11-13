@@ -6,7 +6,7 @@ import pathlib
 
 import github
 
-from scripts import FogRepoManager, FOG, FOG_EMAIL
+from scripts import FogRepoManager, FOG
 from context import UserRepoContext
 from update_templates import copy_workflows, dump_readme
 
@@ -35,7 +35,7 @@ def purge_content(man: FogRepoManager):
         rel.delete_release()
 
     print('== initialize new github repo and force push with only our template files')
-    with UserRepoContext(man.token, FOG, FOG_EMAIL, man.fork.name, clone=False) as c:
+    with UserRepoContext(man.token, man.user.login, man.user.email, man.fork.name, clone=False) as c:
         copy_workflows(repo_dir=c.cwd)
         dump_readme(repo_dir=c.cwd, man=man)
         c.run(f'git add .')

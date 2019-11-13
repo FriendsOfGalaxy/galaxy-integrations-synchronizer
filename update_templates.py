@@ -18,7 +18,7 @@ def dump_readme(repo_dir, man: FogRepoManager):
         cp = ''
     else:
         owner = man.parent.owner
-        cp = f'Copyright {man.parent.created_at.year} [{owner.name}]({owner.html_url})'
+        cp = f'Copyright {man.parent.created_at.year} [{owner.name or owner.login}]({owner.html_url})'
 
     with open(os.path.join('templates', 'README.md'), 'r') as f:
         readme = f.read().format(title=title, url=url, copyright=cp)

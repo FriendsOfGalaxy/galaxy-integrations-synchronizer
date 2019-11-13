@@ -18,8 +18,8 @@ from distutils.version import StrictVersion
 
 import github
 
+
 FOG = 'FriendsOfGalaxy'
-FOG_EMAIL = 'FriendsOfGalaxy@gmail.com'
 
 RELEASE_MESSAGE = "Release version {tag}\n\nVersion {tag}"
 RELEASE_FILE ="current_version.json"
@@ -54,7 +54,7 @@ def _run(*args, **kwargs):
 class LocalRepo:
     MANIFEST = 'manifest.json'
     REQUIREMENTS = os.path.join('requirements', 'app.txt')
-    REQUIREMENTS_LEGACY = 'requirements.txt'
+    REQUIREMENTS_ALTERNATIVE = 'requirements.txt'
 
     def __init__(self, branch=None, check_requirements=True):
         self._manifest_dir = None
@@ -98,7 +98,7 @@ class LocalRepo:
     def requirements_path(self):
         req = pathlib.Path(self.REQUIREMENTS)
         if not req.exists():
-            req = pathlib.Path(self.REQUIREMENTS_LEGACY)
+            req = pathlib.Path(self.REQUIREMENTS_ALTERNATIVE)
         return req
 
     def get_local_version(self):
@@ -120,7 +120,9 @@ class FogRepoManager:
 
     def __init__(self, token, fork_repo):
         self.token = token
-        self.fork = github.Github(token).get_repo(fork_repo)
+        g = github.Github(token)
+        self.user = g.get_user()
+        self.fork = g.get_repo(fork_repo)
         self.parent = self.fork.parent
         self._release_branch = None
 
@@ -209,11 +211,11 @@ def _remove_items(paths):
                 raise
 
 
-def _fog_git_init(token, repo, upstream=None):
-    origin = f'https://{FOG}:{token}@github.com/{repo}.git'
+def _fog_git_init(login, email, token, repo, upstream=None):
+    origin = f'https://{login}:{token}@github.com/{repo}.git'
 
-    _run(f'git config user.name {FOG}')
-    _run(f'git config user.email {FOG_EMAIL}')
+    _run(f'git config user.name {login}')
+    _run(f'git config user.email {email}')
     _run(f'git remote set-url {ORIGIN_REMOTE} {origin}')
     if upstream is not None:
         _run(f'git remote add {UPSTREAM_REMOTE} {upstream}')
@@ -224,7 +226,7 @@ def sync(api):
     Checks if there is new version (in manifest) on upstream versus current master.
     If so, synchronize upstream changes to ORIGIN_REMOTE/FOG_PR_BRANCH
     """
-    _fog_git_init(api.token, api.fork.full_name, upstream=api.parent.clone_url)
+    _fog_git_init(api.user.login, api.user.email, api.token, api.fork.full_name, upstream=api.parent.clone_url)
 
     # verify license
     api.get_parent_license()
@@ -234,12 +236,10 @@ def sync(api):
 
     # Comparing master version with upstream
     local_repo = LocalRepo(branch=FOG_BASE, check_requirements=False)
-    initial_merge = False
     try:
         master_version = StrictVersion(local_repo.get_local_version())
     except FileNotFoundError:
         print('No local version - assuming it is initial PR. Going on.')
-        initial_merge = True
     else:
         if strict_upstream_ver <= master_version:
             msg = f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {master_version}'
@@ -254,10 +254,7 @@ def sync(api):
     _remove_items(PATHS_TO_EXCLUDE)
 
     print(f'merging latest release from {UPSTREAM_REMOTE}/{api.release_branch}')
-    if initial_merge:
-        _run(f'git merge --allow-unrelated-histories --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
-    else:
-        _run(f'git merge --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
+    _run(f'git merge --allow-unrelated-histories --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
 
     print('checkout reserved files')
     for path in PATHS_TO_EXCLUDE:
@@ -390,7 +387,7 @@ def update_release_file(api):
     with open(RELEASE_FILE, 'w') as f:
         json.dump(data, f, indent=4)
 
-    _fog_git_init(api.token, api.fork.full_name)
+    _fog_git_init(api.user.login, api.user.email, api.token, api.fork.full_name)
 
     _run(f'git add {RELEASE_FILE}')
     _run(f'git commit -m "{RELEASE_FILE_COMMIT_MESSAGE}"')

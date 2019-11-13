@@ -7,9 +7,9 @@ import shutil
 
 
 class UserRepoContext:
-    def __init__(self, token, user, email, repo_name, clone=True):
+    def __init__(self, token, login, email, repo_name, clone=True):
         self.token = token
-        self.user = user
+        self.login = login
         self.email = email
         self.repo = repo_name
         self.clone = clone
@@ -23,7 +23,7 @@ class UserRepoContext:
     def __enter__(self):
         self._tmpdir = tempfile.mkdtemp()
         self._cwd = self._tmpdir
-        auth_url = f'https://{self.user}:{self.token}@github.com/{self.user}/{self.repo}.git'
+        auth_url = f'https://{self.login}:{self.token}@github.com/{self.login}/{self.repo}.git'
 
         if self.clone:
             self.run(f'git clone {auth_url}')
@@ -33,7 +33,7 @@ class UserRepoContext:
             self.run(f'git remote add origin {auth_url}')
 
         self.run(f'git config --local user.email "{self.email}"')
-        self.run(f'git config --local user.name "{self.user}"')
+        self.run(f'git config --local user.name "{self.login}"')
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
