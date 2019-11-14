@@ -243,7 +243,7 @@ def sync(api):
     # switching to autoupdate branch
     local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
 
-    _run(f'git remote set-url {ORIGIN_REMOTE} https://{api.user.login}:{api.token}@github.com/{api.fork.full_name}.git')
+    _run(f'git remote set-url {ORIGIN_REMOTE} https://{FOG_USER.login}:{api.token}@github.com/{api.fork.full_name}.git')
     _run(f'git remote add {UPSTREAM_REMOTE} {api.parent.clone_url}')
 
     _run(f'git fetch {UPSTREAM_REMOTE}')
@@ -386,7 +386,7 @@ def update_release_file(api):
         json.dump(data, f, indent=4)
 
     LocalRepo()
-    _run(f'git remote set-url {ORIGIN_REMOTE} https://{api.user.login}:{api.token}@github.com/{api.fork.full_name}.git')
+    _run(f'git remote set-url {ORIGIN_REMOTE} https://{FOG_USER.login}:{api.token}@github.com/{api.fork.full_name}.git')
 
     _run(f'git add {RELEASE_FILE}')
     _run(f'git commit -m "{RELEASE_FILE_COMMIT_MESSAGE}"')
