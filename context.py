@@ -7,10 +7,11 @@ import shutil
 
 
 class UserRepoContext:
-    def __init__(self, token, login, email, repo_name, clone=True):
+    def __init__(self, token, login, committer_name, committer_email, repo_name, clone=True):
         self.token = token
         self.login = login
-        self.email = email
+        self.name = committer_name
+        self.email = committer_email
         self.repo = repo_name
         self.clone = clone
         self._tmpdir = None
@@ -33,7 +34,7 @@ class UserRepoContext:
             self.run(f'git remote add origin {auth_url}')
 
         self.run(f'git config --local user.email "{self.email}"')
-        self.run(f'git config --local user.name "{self.login}"')
+        self.run(f'git config --local user.name "{self.name}"')
         return self
 
     def __exit__(self, exc_type, exc_value, tb):

@@ -12,6 +12,7 @@ import tempfile
 import argparse
 import subprocess
 import urllib.request
+from collections import namedtuple
 from distutils.dir_util import copy_tree
 from distutils.file_util import copy_file
 from distutils.version import StrictVersion
@@ -19,7 +20,9 @@ from distutils.version import StrictVersion
 import github
 
 
-FOG = 'FriendsOfGalaxy'
+GitUser = namedtuple('GitUser', ['login', 'email'])
+FOG_USER = GitUser('FriendsOfGalaxy', 'FriendsOfGalaxy@gmail.com')
+BOT_USER = GitUser('FriendsOfGalaxyBot', 'FriendsOfGalaxy+bot@gmail.com')
 
 RELEASE_MESSAGE = "Release version {tag}\n\nVersion {tag}"
 RELEASE_FILE ="current_version.json"
@@ -60,10 +63,16 @@ class LocalRepo:
         self._manifest_dir = None
         self._manifest = None
 
+        self._user_setup()
         if branch is not None and branch != self.current_branch:
             self._checkout(branch)
         if check_requirements:
             assert self.requirements_path.exists(), f"No requirements file found on {self.current_branch}"
+
+    @staticmethod
+    def _user_setup():
+        _run(f'git config user.name {BOT_USER.login}')
+        _run(f'git config user.email {BOT_USER.email}')
 
     @staticmethod
     def _checkout(branch):
@@ -118,9 +127,9 @@ class FogRepoManager:
     FOG_RELEASE = 'fog_release'
     ALLOWED_LICENSES = ['mit', 'gpl-3.0']
 
-    def __init__(self, token, fork_repo):
-        self.token = token
-        g = github.Github(token)
+    def __init__(self, fog_token, fork_repo):
+        self.token = fog_token
+        g = github.Github(fog_token)
         self.user = g.get_user()
         self.fork = g.get_repo(fork_repo)
         self.parent = self.fork.parent
@@ -136,10 +145,6 @@ class FogRepoManager:
             if e.status == 404:
                 return self.parent.default_branch
             raise
-
-    @property
-    def upstream_user_name(self):
-        return self.parent.full_name
 
     def _iterate_files(self, repo, ref, dir_):
         """BFS walk through parent repo files using github API
@@ -211,14 +216,6 @@ def _remove_items(paths):
                 raise
 
 
-def _fog_git_init(login, email, token, repo, upstream=None):
-    origin = f'https://{login}:{token}@github.com/{repo}.git'
-
-    _run(f'git config user.name {login}')
-    _run(f'git config user.email {email}')
-    _run(f'git remote set-url {ORIGIN_REMOTE} {origin}')
-    if upstream is not None:
-        _run(f'git remote add {UPSTREAM_REMOTE} {upstream}')
 
 
 def sync(api):
@@ -226,8 +223,6 @@ def sync(api):
     Checks if there is new version (in manifest) on upstream versus current master.
     If so, synchronize upstream changes to ORIGIN_REMOTE/FOG_PR_BRANCH
     """
-    _fog_git_init(api.user.login, api.user.email, api.token, api.fork.full_name, upstream=api.parent.clone_url)
-
     # verify license
     api.get_parent_license()
     # verify upstream version
@@ -245,8 +240,11 @@ def sync(api):
             msg = f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {master_version}'
             raise RuntimeError(msg)
 
-    # switching to autoupdate
+    # switching to autoupdate branch
     local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
+
+    _run(f'git remote set-url {ORIGIN_REMOTE} https://{api.user.login}:{api.token}@github.com/{api.fork.full_name}.git')
+    _run(f'git remote add {UPSTREAM_REMOTE} {api.parent.clone_url}')
 
     _run(f'git fetch {UPSTREAM_REMOTE}')
 
@@ -387,7 +385,8 @@ def update_release_file(api):
     with open(RELEASE_FILE, 'w') as f:
         json.dump(data, f, indent=4)
 
-    _fog_git_init(api.user.login, api.user.email, api.token, api.fork.full_name)
+    LocalRepo()
+    _run(f'git remote set-url {ORIGIN_REMOTE} https://{api.user.login}:{api.token}@github.com/{api.fork.full_name}.git')
 
     _run(f'git add {RELEASE_FILE}')
     _run(f'git commit -m "{RELEASE_FILE_COMMIT_MESSAGE}"')
@@ -396,7 +395,7 @@ def update_release_file(api):
 
 def main():
     current_dir = pathlib.Path(os.getcwd()).name
-    default_repo = f'{FOG}/{current_dir}'
+    default_repo = f'{FOG_USER.login}/{current_dir}'
 
     parser = argparse.ArgumentParser()
     parser.add_argument('task', choices=['sync', 'build', 'release', 'update_release_file'])

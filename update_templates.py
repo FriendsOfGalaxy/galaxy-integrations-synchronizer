@@ -7,7 +7,7 @@ import shutil
 import glob
 
 from context import UserRepoContext
-from scripts import FogRepoManager, FOG
+from scripts import FogRepoManager, BOT_USER, FOG_USER
 
 
 def dump_readme(repo_dir, man: FogRepoManager):
@@ -43,9 +43,9 @@ if __name__ == "__main__":
     last_commit_msg = proc.stdout.strip()
 
     for repo_name in names:
-        man = FogRepoManager(tkn, f'{FOG}/{repo_name}')
+        man = FogRepoManager(tkn, f'{FOG_USER.login}/{repo_name}')
 
-        with UserRepoContext(tkn, FOG, 'FriendsOfGalaxy+bot@gmail.com', repo_name) as c:
+        with UserRepoContext(tkn, FOG_USER.login, BOT_USER.login, BOT_USER.email, repo_name) as c:
             print('> copying workflow files')
             copy_workflows(repo_dir=c.cwd)
             dump_readme(repo_dir=c.cwd, man=man)
