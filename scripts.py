@@ -48,7 +48,7 @@ def _run(*args, **kwargs):
     except subprocess.CalledProcessError as e:
         err_str = f'{e.output}\n{e.stderr}'
         print('><', err_str)
-        raise
+        raise e
     else:
         print('>>', out.stdout)
     return out
@@ -256,7 +256,16 @@ def sync(api):
     _remove_items(PATHS_TO_EXCLUDE)
 
     print(f'merging latest release from {UPSTREAM_REMOTE}/{api.release_branch}')
-    _run(f'git merge --allow-unrelated-histories --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
+    try:
+        _run(f'git merge --allow-unrelated-histories --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
+    except subprocess.CalledProcessError as e:
+        _run(f'git status')
+        # file-conflicts - not like diff conflicts within the same file - need manual resolve
+        if "CONFLICT" in e.output:
+            _run(f'git checkout --theirs ./*')
+            _run(f'git add .')
+        else:
+            raise
 
     print('checkout reserved files')
     for path in PATHS_TO_EXCLUDE:
