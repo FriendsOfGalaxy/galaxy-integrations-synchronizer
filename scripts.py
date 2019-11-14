@@ -229,6 +229,9 @@ def sync(api):
     upstream_ver = api.get_parent_manifest()['version']
     strict_upstream_ver = StrictVersion(upstream_ver)
 
+    _run(f'git remote set-url {ORIGIN_REMOTE} https://{FOG_USER.login}:{api.token}@github.com/{api.fork.full_name}.git')
+    _run(f'git remote add {UPSTREAM_REMOTE} {api.parent.clone_url}')
+
     # Comparing master version with upstream
     local_repo = LocalRepo(branch=FOG_BASE, check_requirements=False)
     try:
@@ -243,10 +246,11 @@ def sync(api):
     # switching to autoupdate branch
     local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
 
-    _run(f'git remote set-url {ORIGIN_REMOTE} https://{FOG_USER.login}:{api.token}@github.com/{api.fork.full_name}.git')
-    _run(f'git remote add {UPSTREAM_REMOTE} {api.parent.clone_url}')
-
     _run(f'git fetch {UPSTREAM_REMOTE}')
+    _run(f'git fetch {ORIGIN_REMOTE}')
+
+    print('reset autoupdate branch to our default branch')
+    _run(f'git reset --hard {ORIGIN_REMOTE}/{FOG_BASE}')
 
     print('removing reserved files')
     _remove_items(PATHS_TO_EXCLUDE)
@@ -263,7 +267,7 @@ def sync(api):
 
     print('commit and push')
     _run(f'git commit -m "Merge upstream"')
-    _run(f'git push {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
+    _run(f'git push -f {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
 
     api.create_or_update_pr(upstream_ver)
 
