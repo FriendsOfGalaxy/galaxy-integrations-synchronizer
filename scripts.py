@@ -169,7 +169,7 @@ class FogRepoManager:
                 return json.loads(it.decoded_content)
         raise RuntimeError('manifest.json not found in parent repository!')
 
-    def _get_autoupdate_pr(self):
+    def get_autoupdate_pr(self):
         pulls = self.fork.get_pulls(state='open', base=FOG_BASE, head=FOG_PR_BRANCH)
         assert pulls.totalCount <= 1
         if pulls.totalCount == 0:
@@ -178,7 +178,7 @@ class FogRepoManager:
 
     def create_or_update_pr(self, version):
         title = f"Version {version}"
-        pr = self._get_autoupdate_pr()
+        pr = self.get_autoupdate_pr()
 
         if pr is not None:
             print(f'updating pull-request title version to {version}')
@@ -202,6 +202,17 @@ class FogRepoManager:
             raise ValueError(f'{lic} license is not supported.')
         return lic
 
+    def remove_fork_ref(self, ref, ignore_fail=False) -> None:
+        """ref in form of head/<branch_name> or tags/<tag>"""
+        try:
+            git_ref = self.fork.get_git_ref(ref)
+        except github.UnknownObjectException:
+            if not ignore_fail:
+                raise
+        else:
+            git_ref.delete()
+
+
 def _remove_items(paths):
     """Silently removes files or whole dir trees."""
     print('removing paths:', paths)
@@ -214,8 +225,6 @@ def _remove_items(paths):
         except OSError as e:
             if e.errno != errno.ENOENT:  # file not exists
                 raise
-
-
 
 
 def sync(api):
@@ -233,35 +242,39 @@ def sync(api):
     _run(f'git remote add {UPSTREAM_REMOTE} {api.parent.clone_url}')
 
     # Comparing master version with upstream
+    initial_commit = False
     local_repo = LocalRepo(branch=FOG_BASE, check_requirements=False)
     try:
         master_version = StrictVersion(local_repo.get_local_version())
     except FileNotFoundError:
         print('No local version - assuming it is initial PR. Going on.')
+        initial_commit = True
     else:
         if strict_upstream_ver <= master_version:
             msg = f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {master_version}'
-            raise RuntimeError(msg)
+            print(msg)
+            return
+
+    # prevents dealing with already updated FOG_PR_BRANCH in case PR was closed
+    if api.get_autoupdate_pr() is None:
+        print(f'silently removing {FOG_PR_BRANCH} branch because PR is not open')
+        api.remove_fork_ref(f'heads/{FOG_PR_BRANCH}', ignore_fail=True)
 
     # switching to autoupdate branch
     local_repo = LocalRepo(branch=FOG_PR_BRANCH, check_requirements=False)
 
     _run(f'git fetch {UPSTREAM_REMOTE}')
-    _run(f'git fetch {ORIGIN_REMOTE}')
-
-    print('reset autoupdate branch to our default branch')
-    _run(f'git reset --hard {ORIGIN_REMOTE}/{FOG_BASE}')
 
     print('removing reserved files')
     _remove_items(PATHS_TO_EXCLUDE)
 
     print(f'merging latest release from {UPSTREAM_REMOTE}/{api.release_branch}')
+    unreleated_history = "--allow-unrelated-histories" if initial_commit else ''
     try:
-        _run(f'git merge --allow-unrelated-histories --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
+        _run(f'git merge {unreleated_history} --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
     except subprocess.CalledProcessError as e:
         _run(f'git status')
-        # file-conflicts - not like diff conflicts within the same file - need manual resolve
-        if "CONFLICT" in e.output:
+        if "CONFLICT" in e.output:  # case where file is renamed/deleted
             _run(f'git checkout --theirs ./*')
             _run(f'git add .')
         else:
@@ -275,8 +288,14 @@ def sync(api):
             print(f'Warning: Cannot checkout {path} from remote {FOG_BASE}')
 
     print('commit and push')
-    _run(f'git commit -m "Merge upstream"')
-    _run(f'git push -f {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
+    try:
+        _run(f'git commit -m "Merge upstream"')
+    except subprocess.CalledProcessError as e:
+        if 'Nothing to merge' in e.output:
+            return
+        raise
+
+    _run(f'git push {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
 
     api.create_or_update_pr(upstream_ver)
 
