@@ -12,6 +12,11 @@ import tempfile
 import argparse
 import subprocess
 import urllib.request
+
+import smtplib, ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
 from collections import namedtuple
 from distutils.dir_util import copy_tree
 from distutils.file_util import copy_file
@@ -52,6 +57,26 @@ def _run(*args, **kwargs):
     else:
         print('>>', out.stdout)
     return out
+
+
+class SmtpGmailSender:
+    def __init__(self, email, password):
+        self.email = email
+        self.password = password
+        self.host = "smtp.gmail.com"
+        self.port = smtplib.SMTP_SSL_PORT
+
+    def send(self, to, subject, body):
+        msg = MIMEMultipart()
+        msg['From'] = self.email
+        msg['To'] = to
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body))
+
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL(self.host, self.port, context=context) as server:
+            server.login(self.email, self.password)
+            server.sendmail(self.email, to, msg.as_string())
 
 
 class LocalRepo:
@@ -426,6 +451,7 @@ def update_release_file(api):
 
 
 def main():
+    mailer = SmtpGmailSender('mailer.fog@gmail.com', os.environ['MAILER_LOGIN'])
     current_dir = pathlib.Path(os.getcwd()).name
     default_repo = f'{FOG_USER.login}/{current_dir}'
 
@@ -434,7 +460,6 @@ def main():
     parser.add_argument('--dir', required=sys.argv[1] in ['build', 'release'], help='build directory')
     parser.add_argument('--token', default=os.environ.get('GITHUB_TOKEN'), help='github token with repo access')
     parser.add_argument('--repo', default=default_repo, help='github_user/repository_name')
-
     args = parser.parse_args()
 
     if args.task == 'build':
@@ -445,14 +470,19 @@ def main():
         raise RuntimeError('Github token not found. Have you set it in secrets?')
     man = FogRepoManager(args.token, args.repo)
 
-    if args.task == 'sync':
-        sync(man)
-    elif args.task == 'release':
-        release(args.dir)
-    elif args.task == 'update_release_file':
-        update_release_file(man)
-    else:
-        raise RuntimeError(f'unknown command {args.task}')
+    try:
+        if args.task == 'sync':
+            sync(man)
+        elif args.task == 'release':
+            release(args.dir)
+        elif args.task == 'update_release_file':
+            update_release_file(man)
+        else:
+            raise RuntimeError(f'unknown command {args.task}')
+    except Exception:
+        subject = f'Workflow failed ({args.task})'
+        body = f'https://github.com/{default_repo}/actions'
+        mailer.send(FOG_USER.email, subject, body)
 
 
 if __name__ == "__main__":
