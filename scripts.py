@@ -489,8 +489,7 @@ def main():
         sha = _run('git rev-parse --verify HEAD').stdout.strip()
         subject = f'Workflow {args.task} failed for repo {args.task})'
         body = f'https://github.com/{args.repo}/actions'
-        body += '\n\n Last check for this sha:'
-        body += f'https://github.com{args.repo}/commit/{sha}/checks'
+        body += f'\n\n Last check for this sha: https://github.com{args.repo}/commit/{sha}/checks'
         mailer.send(FOG_USER.email, subject, body)
         raise
 
