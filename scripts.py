@@ -492,6 +492,7 @@ def main():
         body += '\n\n Last check for this sha:'
         body += f'https://github.com{args.repo}/commit/{sha}/checks'
         mailer.send(FOG_USER.email, subject, body)
+        raise
 
 
 if __name__ == "__main__":
