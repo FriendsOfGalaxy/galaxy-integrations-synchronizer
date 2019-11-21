@@ -233,8 +233,9 @@ class FogRepoManager:
         """ref in form of head/<branch_name> or tags/<tag>"""
         try:
             git_ref = self.fork.get_git_ref(ref)
-        except github.UnknownObjectException:
+        except github.UnknownObjectException as e:
             if not ignore_fail:
+                print(f'ignoring get_git_ref error: {e}')
                 raise
         else:
             git_ref.delete()
@@ -254,10 +255,11 @@ def _remove_items(paths):
                 raise
 
 
-def sync(api):
+def sync(api) -> bool:
     """
     Checks if there is new version (in manifest) on upstream versus current master.
     If so, synchronize upstream changes to ORIGIN_REMOTE/FOG_PR_BRANCH
+    Returns True if new update were pushed succesfully
     """
     # verify license
     api.get_parent_license()
@@ -280,7 +282,7 @@ def sync(api):
         if strict_upstream_ver <= master_version:
             msg = f'== No new version to be sync to. Upstream: {upstream_ver}, fork on branch {local_repo.current_branch}: {master_version}'
             print(msg)
-            return
+            return False
 
     # prevents dealing with already updated FOG_PR_BRANCH in case PR was closed
     if api.get_autoupdate_pr() is None:
@@ -319,12 +321,13 @@ def sync(api):
         _run(f'git commit -m "Merge upstream"')
     except subprocess.CalledProcessError as e:
         if 'Nothing to merge' in e.output:
-            return
+            return False
         raise
 
     _run(f'git push {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
 
     api.create_or_update_pr(upstream_ver)
+    return True
 
 
 def build(output, user_repo_name):
@@ -474,7 +477,8 @@ def main():
 
     try:
         if args.task == 'sync':
-            sync(man)
+            if sync(man):
+                mailer.send(FOG_USER, f'New update for {args.repo}', f'https://github.com/{args.repo}/pulls')
         elif args.task == 'release':
             release(args.dir)
         elif args.task == 'update_release_file':
@@ -482,8 +486,11 @@ def main():
         else:
             raise RuntimeError(f'unknown command {args.task}')
     except Exception:
-        subject = f'Workflow failed ({args.task})'
-        body = f'https://github.com/{default_repo}/actions'
+        sha = _run('git rev-parse --verify HEAD').stdout.strip()
+        subject = f'Workflow {args.task} failed for repo {args.task})'
+        body = f'https://github.com/{args.repo}/actions'
+        body += '\n\n Last check for this sha:'
+        body += f'https://github.com{args.repo}/commit/{sha}/checks'
         mailer.send(FOG_USER.email, subject, body)
 
 
