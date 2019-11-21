@@ -60,6 +60,8 @@ def _run(*args, **kwargs):
 
 
 class SmtpGmailSender:
+    """Workaround for github false positives about failed action notifications"""
+
     def __init__(self, email, password):
         self.email = email
         self.password = password
@@ -451,7 +453,7 @@ def update_release_file(api):
 
 
 def main():
-    mailer = SmtpGmailSender('mailer.fog@gmail.com', os.environ['MAILER_LOGIN'])
+    mailer = SmtpGmailSender('mailer.fog@gmail.com', os.environ['MAILER_PASSWORD'])
     current_dir = pathlib.Path(os.getcwd()).name
     default_repo = f'{FOG_USER.login}/{current_dir}'
 
