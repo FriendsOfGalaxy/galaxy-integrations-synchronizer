@@ -478,7 +478,7 @@ def main():
     try:
         if args.task == 'sync':
             if sync(man):
-                mailer.send(FOG_USER, f'New update for {args.repo}', f'https://github.com/{args.repo}/pulls')
+                mailer.send(FOG_USER.email, f'New update for {args.repo}', f'https://github.com/{args.repo}/pulls')
         elif args.task == 'release':
             release(args.dir)
         elif args.task == 'update_release_file':
@@ -487,7 +487,7 @@ def main():
             raise RuntimeError(f'unknown command {args.task}')
     except Exception:
         sha = _run('git rev-parse --verify HEAD').stdout.strip()
-        subject = f'Workflow {args.task} failed for repo {args.task})'
+        subject = f'Workflow {args.task} failed for repo {args.repo}'
         body = f'https://github.com/{args.repo}/actions'
         body += f'\n\n Last check for this sha: https://github.com{args.repo}/commit/{sha}/checks'
         mailer.send(FOG_USER.email, subject, body)
