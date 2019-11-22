@@ -89,7 +89,8 @@ def add_to_synced(fork_name: str):
 
 def invite_ci_bot(man: FogRepoManager):
     bot = github.Github().get_user(BOT_USER.login)
-    man.fork.add_to_collaborators(bot)
+    permission_level = 'push'
+    man.fork.add_to_collaborators(bot, permission_level)
 
 
 def accept_bot_invitations(bot_token):

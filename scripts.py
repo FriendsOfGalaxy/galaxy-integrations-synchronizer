@@ -220,6 +220,12 @@ class FogRepoManager:
             )
             pr.set_labels('autoupdate')
 
+    def assign_review(self):
+        """Currently only to FoG"""
+        reviewers = [self.user.login]
+        pr = self.get_autoupdate_pr()
+        pr.create_review_request(reviewers)
+
     def get_parent_license(self) -> github.License.License:
         try:
             lic = self.parent.get_license().license
@@ -327,7 +333,10 @@ def sync(api) -> bool:
     _run(f'git push {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
 
     api.create_or_update_pr(upstream_ver)
-    return True
+    try:
+        api.assign_review()
+    finally:
+        return True
 
 
 def build(output, user_repo_name):
