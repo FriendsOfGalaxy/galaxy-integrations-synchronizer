@@ -39,7 +39,7 @@ jobs:
 
     - name: Trigger sync event on test repo fork
       env:
-        GITHUB_TOKEN: ${{ secrets.PTOKEN }}
+        GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
       run: |
         hub api -t -X POST -H "Authorization:token $GITHUB_TOKEN" \
         -H "Accept:application/vnd.github.everest-preview+json,application/vnd.github.v3+json" \
