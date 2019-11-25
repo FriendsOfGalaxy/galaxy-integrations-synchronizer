@@ -240,6 +240,21 @@ class FogRepoManager:
         else:
             git_ref.delete()
 
+    def send_repository_dispatch(self, event_type):
+        self.fork
+        url = f'https://api.github.com/repos/{self.fork.full_name}/dispatches'
+        body = {
+            "event_type": event_type
+        }
+        headers = {
+            "Authorization": "token " + self.token,
+            "Accept": "application/vnd.github.everest-preview+json, application/vnd.github.v3+json",
+            "Content-Type": "application/json"
+        }
+        jsondata = json.dumps(body).encode('utf-8')
+        req = urllib.request.Request(url, jsondata, headers)
+        urllib.request.urlopen(req)
+
 
 def _remove_items(paths):
     """Silently removes files or whole dir trees."""
@@ -479,6 +494,8 @@ def main():
         if args.task == 'sync':
             if sync(man):
                 mailer.send(FOG_USER.email, f'New update for {args.repo}', f'https://github.com/{args.repo}/pulls')
+                # Workaround for not working pull_request on forks: https://github.community/t5/GitHub-Actions/Github-Workflow-not-running-from-pull-request-from-forked/m-p/33484/highlight/true#M1524
+                man.send_repository_dispatch('validation')
         elif args.task == 'release':
             release(args.dir)
         elif args.task == 'update_release_file':
@@ -489,7 +506,7 @@ def main():
         sha = _run('git rev-parse --verify HEAD').stdout.strip()
         subject = f'Workflow {args.task} failed for repo {args.repo}'
         body = f'https://github.com/{args.repo}/actions'
-        body += f'\n\n Last check for this sha: https://github.com{args.repo}/commit/{sha}/checks'
+        body += f'\n\n Last check for this sha: https://github.com/{args.repo}/commit/{sha}/checks'
         mailer.send(FOG_USER.email, subject, body)
         raise
 
