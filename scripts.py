@@ -241,7 +241,6 @@ class FogRepoManager:
             git_ref.delete()
 
     def send_repository_dispatch(self, event_type):
-        self.fork
         url = f'https://api.github.com/repos/{self.fork.full_name}/dispatches'
         body = {
             "event_type": event_type
