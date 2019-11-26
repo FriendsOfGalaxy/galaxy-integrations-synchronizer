@@ -93,12 +93,17 @@ def invite_ci_bot(man: FogRepoManager):
     man.fork.add_to_collaborators(bot, permission_level)
 
 
-def accept_bot_invitations(bot_token):
-    # BOT_USER context
+def wait_and_accept_invitations_by_bot(bot_token, timeout):
     authenticated_bot = github.Github(bot_token).get_user()
-    for i in authenticated_bot.get_invitations():
-        authenticated_bot.accept_invitation(i)
-        print(f'Bot accepted invitation {i}')
+    timeout_stamp = time.time() + timeout
+    while time.time() < timeout_stamp:
+        for i in authenticated_bot.get_invitations():
+            authenticated_bot.accept_invitation(i)
+            print(f'Bot accepted invitation {i}')
+            return
+        print('No invitations recaived by bot...')
+        time.sleep(1)
+    raise RuntimeError(f'No invitation received by bot in {timeout} seconds')
 
 
 if __name__ == "__main__":
@@ -130,5 +135,4 @@ if __name__ == "__main__":
             purge_content(man)
 
     invite_ci_bot(man)
-    time.sleep(2)  # give github a while to process
-    accept_bot_invitations(bot_token)
+    wait_and_accept_invitations_by_bot(bot_token, timeout=5)
