@@ -1,4 +1,5 @@
 import os
+import time
 import argparse
 import json
 import sys
@@ -86,6 +87,25 @@ def add_to_synced(fork_name: str):
         json.dump(config, f, indent=4
 
 
+def invite_ci_bot(man: FogRepoManager):
+    bot = github.Github().get_user(BOT_USER.login)
+    permission_level = 'push'
+    man.fork.add_to_collaborators(bot, permission_level)
+
+
+def wait_and_accept_invitations_by_bot(bot_token, timeout):
+    authenticated_bot = github.Github(bot_token).get_user()
+    timeout_stamp = time.time() + timeout
+    while time.time() < timeout_stamp:
+        for i in authenticated_bot.get_invitations():
+            authenticated_bot.accept_invitation(i)
+            print(f'Bot accepted invitation {i}')
+            return
+        print('No invitations recaived by bot...')
+        time.sleep(1)
+    raise RuntimeError(f'No invitation received by bot in {timeout} seconds')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('repo', help="Original repository full name for example user/galaxy-plugin-xxx")
@@ -100,6 +120,10 @@ if __name__ == "__main__":
         token = os.environ['FOG_GITHUB_TOKEN']
     except KeyError:
         raise RuntimeError('FOG_GITHUB_TOKEN required as environmental variable')
+    try:
+        bot_token = os.environ['BOT_TOKEN']
+    except KeyError:
+        raise RuntimeError('BOT_TOKEN required as environmental variable')
 
     fork = fork_repo(token, args.repo)
     man = FogRepoManager(token, fork.full_name)
@@ -109,3 +133,6 @@ if __name__ == "__main__":
         msg = 'Unreversable decision. Are you sure you want to remove all the content, all branches and releases from this repository?'
         if input(f"{msg} (y/N)? ").lower() == 'y':
             purge_content(man)
+
+    invite_ci_bot(man)
+    wait_and_accept_invitations_by_bot(bot_token, timeout=5)
