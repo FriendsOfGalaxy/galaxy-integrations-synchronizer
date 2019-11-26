@@ -76,14 +76,14 @@ def add_to_synced(fork_name: str):
     """
     print('=== adding to sync config')
     SYNC_CONFIG_PATH = os.path.join('config.json')
-    with open(SYNC_CONFIG_PATH, 'r+') as f:
+    with open(SYNC_CONFIG_PATH, 'r') as f:
         config = json.load(f)
-        if fork_name in config['forks_to_sync']:
-            print('=== already added')
-            return
-        config['forks_to_sync'].append(fork_name)
-        f.truncate(0)
-        json.dump(config, f, indent=4)
+    if fork_name in config['forks_to_sync']:
+        print('=== already added')
+        return
+    config['forks_to_sync'].append(fork_name)
+    with open(SYNC_CONFIG_PATH, 'w'):
+        json.dump(config, f, indent=4
 
 
 if __name__ == "__main__":
