@@ -83,8 +83,8 @@ def add_to_synced(fork_name: str):
         print('=== already added')
         return
     config['forks_to_sync'].append(fork_name)
-    with open(SYNC_CONFIG_PATH, 'w'):
-        json.dump(config, f, indent=4
+    with open(SYNC_CONFIG_PATH, 'w') as f:
+        json.dump(config, f, indent=4)
 
 
 def invite_ci_bot(man: FogRepoManager):
@@ -134,5 +134,6 @@ if __name__ == "__main__":
         if input(f"{msg} (y/N)? ").lower() == 'y':
             purge_content(man)
 
-    invite_ci_bot(man)
-    wait_and_accept_invitations_by_bot(bot_token, timeout=5)
+    if BOT_USER.login not in [i.login for i in fork.get_collaborators()]:
+        invite_ci_bot(man)
+        wait_and_accept_invitations_by_bot(bot_token, timeout=5)
