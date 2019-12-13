@@ -340,7 +340,7 @@ def sync(api) -> bool:
     try:
         _run(f'git commit -m "Merge upstream"')
     except subprocess.CalledProcessError as e:
-        if 'Nothing to merge' in e.output:
+        if 'nothing to commit' in e.output.lower():
             return False
         raise
 
