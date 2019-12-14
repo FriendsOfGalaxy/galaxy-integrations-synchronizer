@@ -491,6 +491,7 @@ def main():
     args = parser.parse_args()
 
     if args.task == 'build':
+        assert args.token is None
         build(args.dir, args.repo)
         return
 
