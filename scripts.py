@@ -82,11 +82,13 @@ class SmtpGmailSender:
 
 
 class LocalRepo:
+    CONFIG = '.fog_config.json'
     MANIFEST = 'manifest.json'
     REQUIREMENTS = os.path.join('requirements', 'app.txt')
     REQUIREMENTS_ALTERNATIVE = 'requirements.txt'
 
     def __init__(self, branch=None, check_requirements=True):
+        self._config = None
         self._manifest_dir = None
         self._manifest = None
 
@@ -121,6 +123,14 @@ class LocalRepo:
             self._manifest = json.load(f)
         return self._manifest.copy()
 
+    def _load_config(self):
+        try:
+            with open(self.CONFIG, 'r') as f:
+                self._config = json.load(f)
+                print(f'Config file found: {json.dumps(self._config, indent=4)}')
+        except FileNotFoundError:
+            self._config = dict()
+
     @property
     def current_branch(self):
         proc = _run('git rev-parse --abbrev-ref HEAD')
@@ -141,6 +151,12 @@ class LocalRepo:
         if self._manifest is None:
             self.load_manifest()
         return self._manifest['version']
+
+    @property
+    def dependencies_dir(self) -> str:
+        if self._config is None:
+            self._load_config()
+        return self._config.get("dependencies_dir", '.')
 
     @property
     def manifest_dir(self):
@@ -376,13 +392,14 @@ def build(output, user_repo_name):
         pip_platform = "win32"
     elif sys.platform == "darwin":
         pip_platform = "macosx_10_12_x86_64"
+    pip_target = (outpath / local_repo.dependencies_dir).as_posix()
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
         _run(f'pip-compile {local_repo.requirements_path.as_posix()} --output-file=-', stdout=tmp, stderr=subprocess.PIPE, capture_output=False)
         _run('pip', 'install',
             '-r', tmp.name,
             '--platform', pip_platform,
-            '--target', output,
+            '--target', pip_target,
             '--python-version', '37',
             '--no-compile',
             '--no-deps'
