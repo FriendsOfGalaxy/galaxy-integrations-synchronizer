@@ -26,7 +26,7 @@ def test_manifest_elements(manifest):
 
 def test_manifest_version_versus_master_branch(manifest, capsys):
     """Galaxy downloads plugins only if the version is higher than in local copy.
-    Check if new version will be bumped using StrictVersion comparizon
+    Check if new version will be bumped using StrictVersion comparison
     """
     proc = subprocess.run(
         ["git", "show", "origin/master:current_version.json"],

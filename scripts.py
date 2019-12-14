@@ -334,9 +334,9 @@ def sync(api) -> bool:
     _remove_items(PATHS_TO_EXCLUDE)
 
     print(f'merging latest release from {UPSTREAM_REMOTE}/{api.release_branch}')
-    unreleated_history = "--allow-unrelated-histories" if initial_commit else ''
+    unrelated_history = "--allow-unrelated-histories" if initial_commit else ''
     try:
-        _run(f'git merge {unreleated_history} --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
+        _run(f'git merge {unrelated_history} --no-commit --no-ff -s recursive -Xtheirs {UPSTREAM_REMOTE}/{api.release_branch}')
     except subprocess.CalledProcessError as e:
         _run(f'git status')
         if "CONFLICT" in e.output:  # case where file is renamed/deleted
@@ -431,7 +431,7 @@ def release(build_dir):
         raise RuntimeError(f'No assets found in {build_dir}')
 
     zip_assets_dir = os.path.join('..', 'assets')
-    print(f"Clearning content of {zip_assets_dir}")
+    print(f"Clearing content of {zip_assets_dir}")
     if os.path.exists(zip_assets_dir):
         shutil.rmtree(zip_assets_dir)
     os.makedirs(zip_assets_dir)

@@ -8,7 +8,7 @@ Autosync FriendsOfGalaxy forks with corresponding base repo integration for GOG 
 - is deployed on Github
 - has release branch named `fog_release` (other rules apply only to this branch; if it doesn't exists default branch may be used)
 - dependencies
-    - those not installable by pip should be commited to the git repository in ready-to-use state
+    - those not installable by pip should be committed to the git repository in ready-to-use state
     - those installable by pip are stored in standard pip format in `requirements/app.txt` in the repository root (`requirements.txt` may also used)
         - dependencies are pinned (only using '==') - this is for easier security checks and building final package by us
 - has valid `manifest.json` with all fields listed in Galaxy Plugin Python API documentation
@@ -31,7 +31,7 @@ Currently supported parameters:
 | dependencies_dir | "."           | Directory where dependencies are installed. Relative to directory where `manifest.json` is placed. |
 
 
-#### Examplary .fog_config.json
+#### Exemplary .fog_config.json
 ```json
 {
     "dependencies_dir": "third-party-modules"
