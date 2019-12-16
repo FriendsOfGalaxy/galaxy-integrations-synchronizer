@@ -17,9 +17,11 @@ Autosync FriendsOfGalaxy forks with corresponding base repo integration for GOG 
 
 ### Build process
 
-`fog_release` branch is searched for `manifest.json` location automatically. The direct parent of `manifest.json` is treated as *source directory* and only this is copied to the final build during release package preparation.
+`fog_release` branch is searched for `manifest.json` location automatically. The direct parent of `manifest.json` is treated as *source directory*.
+Only content of *source directory* along with all of its subdirectories is copied to the *build directory* during release package preparation.
 
-Dependencies are installed in `dependencies_dir` (see below) using [pip's --target option](https://pip.pypa.io/en/stable/reference/pip_install/#cmdoption-t).
+Dependencies are installed to root of *build directory* or its subdirectory specified in `.fog_config.json` file using [pip's --target option](https://pip.pypa.io/en/stable/reference/pip_install/#cmdoption-t).
+
 
 ### Configuration
 
