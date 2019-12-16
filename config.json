@@ -1,5 +1,6 @@
 {
     "forks_to_sync": [
+        "update-test-integration",
         "galaxy-integration-bethesda",
         "galaxy-integration-rockstar",
         "galaxy-integration-gw2",
