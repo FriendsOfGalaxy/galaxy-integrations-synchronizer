@@ -15,6 +15,8 @@ Autosync FriendsOfGalaxy forks with corresponding base repo integration for GOG 
     - "version" - in Semantic Versioning but without extensions like "beta" - to be comparable
     - "script" - cannot link to upper directory file
 
+Example of repository structure: https://github.com/FriendsOfGalaxy/template-galaxy-integration/settings
+
 ### Build process
 
 `fog_release` branch is searched for `manifest.json` location automatically. The direct parent of `manifest.json` is treated as *source directory*.
@@ -25,7 +27,7 @@ Dependencies are installed to root of *build directory* or its subdirectory spec
 
 ### Configuration
 
-Optional config file `.fog_config.json` has to be placed in the root directory of the git repository.
+Optional config file `.fog_config.json`, if used, has to be placed in the root directory of the git repository.
 Currently supported parameters:
 
 | Name             | Default       | Description |
