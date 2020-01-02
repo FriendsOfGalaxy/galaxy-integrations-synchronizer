@@ -391,7 +391,7 @@ def build(output, user_repo_name):
     if sys.platform == "win32":
         pip_platform = "win32"
     elif sys.platform == "darwin":
-        pip_platform = "macosx_10_12_x86_64"
+        pip_platform = "macosx_10_13_x86_64"
     pip_target = (outpath / local_repo.dependencies_dir).as_posix()
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
