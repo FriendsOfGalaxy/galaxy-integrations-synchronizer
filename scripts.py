@@ -352,13 +352,12 @@ def sync(api) -> bool:
         except subprocess.CalledProcessError:
             print(f'Warning: Cannot checkout {path} from remote {FOG_BASE}')
 
-    print('commit and push')
-    try:
+    print('commit and push if any changes')
+    if _run('git diff-index --quiet --cached HEAD').returncode == 1:
         _run(f'git commit -m "Merge upstream"')
-    except subprocess.CalledProcessError as e:
-        if 'nothing to commit' in e.output.lower():
-            return False
-        raise
+    else:
+        print('No changes found. Ending')
+        return False
 
     _run(f'git push {ORIGIN_REMOTE} {FOG_PR_BRANCH}')
 
