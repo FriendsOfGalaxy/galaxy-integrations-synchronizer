@@ -46,17 +46,17 @@ def _run(*args, **kwargs):
         cmd = shlex.split(cmd[0])
     kwargs.setdefault("capture_output", True)
     kwargs.setdefault("text", True)
+    kwargs.setdefault("check", True)
     print('executing', cmd)
-    out = subprocess.run(cmd, **kwargs)
     try:
-        out.check_returncode()
+        out = subprocess.run(cmd, **kwargs)
     except subprocess.CalledProcessError as e:
         err_str = f'{e.output}\n{e.stderr}'
         print('><', err_str)
         raise e
     else:
         print('>>', out.stdout)
-    return out
+        return out
 
 
 class SmtpGmailSender:
@@ -353,7 +353,7 @@ def sync(api) -> bool:
             print(f'Warning: Cannot checkout {path} from remote {FOG_BASE}')
 
     print('commit and push if any changes')
-    if _run('git diff-index --quiet --cached HEAD').returncode == 1:
+    if _run('git diff-index --quiet --cached HEAD', check=False).returncode == 1:
         _run(f'git commit -m "Merge upstream"')
     else:
         print('No changes found. Ending')
