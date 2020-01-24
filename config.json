@@ -8,6 +8,7 @@
         "galaxy-integration-wargaming",
         "galaxy-integration-pathofexile",
         "galaxy-integration-minecraft",
-        "galaxy-integration-blizzard"
+        "galaxy-integration-blizzard",
+        "galaxy-integration-ffxiv"
     ]
 }
