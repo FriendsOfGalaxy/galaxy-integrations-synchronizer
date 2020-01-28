@@ -101,7 +101,7 @@ def wait_and_accept_invitations_by_bot(bot_token, timeout):
             authenticated_bot.accept_invitation(i)
             print(f'Bot accepted invitation {i}')
             return
-        print('No invitations recaived by bot...')
+        print('No invitations received by bot...')
         time.sleep(1)
     raise RuntimeError(f'No invitation received by bot in {timeout} seconds')
 
