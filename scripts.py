@@ -85,19 +85,19 @@ class SmtpGmailSender:
 class FogConfig:
     FILENAME = '.fog_config.json'
 
-    def __init__(self, content=None):
-        self._config: Optional[dict] = None
+    def __init__(self, content: dict=None):
         if content is not None:
             self._config = content
-            print(f'Config file loaded: {json.dumps(self._config, indent=4)}')
+        else:
+            self._config = self.load_local()
+        print(f'Config file: {json.dumps(self._config, indent=4)}')
 
-    def load_local(self):
+    def load_local(self) -> dict:
         try:
             with open(self.FILENAME, 'r') as f:
-                self._config = json.load(f)
-                print(f'Config file found: {json.dumps(self._config, indent=4)}')
+                return json.load(f)
         except FileNotFoundError:
-            self._config = dict()
+            return dict()
 
     @property
     def dependencies_dir(self) -> str:
@@ -112,9 +112,7 @@ class LocalRepo:
     def __init__(self, branch=None, check_requirements=True):
         self._manifest_dir = None
         self._manifest = None
-
         self._config = FogConfig()
-        self._config.load_local()
 
         self._user_setup()
         if branch is not None and branch != self.current_branch:
