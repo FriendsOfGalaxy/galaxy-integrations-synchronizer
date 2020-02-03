@@ -375,10 +375,10 @@ def sync(api) -> bool:
             print(f'Warning: Cannot checkout {path} from remote {FOG_BASE}')
 
     upstream_config = api.get_parent_config()
-    upstream_dependencies_dir = upstream_config.dependencies_dir
-    if upstream_dependencies_dir is not None:
-        print(f'Removing found dependencies directory {upstream_dependencies_dir}')
-        _run(f'git rm -rf {upstream_dependencies_dir}')
+    if upstream_config is not None:
+        deps = upstream_config.dependencies_dir
+        print(f'Removing found dependencies directory {deps}')
+        _run(f'git rm -rf {deps}')
     else:
         print(f'No dependencies_dir found in upstream config. Proceeding')
 
