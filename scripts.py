@@ -12,6 +12,7 @@ import tempfile
 import argparse
 import subprocess
 import urllib.request
+from typing import Optional
 
 import smtplib, ssl
 from email.mime.text import MIMEText
@@ -81,16 +82,37 @@ class SmtpGmailSender:
             server.sendmail(self.email, to, msg.as_string())
 
 
+class FogConfig:
+    FILENAME = '.fog_config.json'
+
+    def __init__(self, content: dict=None):
+        if content is not None:
+            self._config = content
+        else:
+            self._config = self.load_local()
+        print(f'Config file: {json.dumps(self._config, indent=4)}')
+
+    def load_local(self) -> dict:
+        try:
+            with open(self.FILENAME, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return dict()
+
+    @property
+    def dependencies_dir(self) -> str:
+        return self._config.get("dependencies_dir", '.')
+
+
 class LocalRepo:
-    CONFIG = '.fog_config.json'
     MANIFEST = 'manifest.json'
     REQUIREMENTS = os.path.join('requirements', 'app.txt')
     REQUIREMENTS_ALTERNATIVE = 'requirements.txt'
 
     def __init__(self, branch=None, check_requirements=True):
-        self._config = None
         self._manifest_dir = None
         self._manifest = None
+        self._config = FogConfig()
 
         self._user_setup()
         if branch is not None and branch != self.current_branch:
@@ -123,14 +145,6 @@ class LocalRepo:
             self._manifest = json.load(f)
         return self._manifest.copy()
 
-    def _load_config(self):
-        try:
-            with open(self.CONFIG, 'r') as f:
-                self._config = json.load(f)
-                print(f'Config file found: {json.dumps(self._config, indent=4)}')
-        except FileNotFoundError:
-            self._config = dict()
-
     @property
     def current_branch(self):
         proc = _run('git rev-parse --abbrev-ref HEAD')
@@ -153,10 +167,8 @@ class LocalRepo:
         return self._manifest['version']
 
     @property
-    def dependencies_dir(self) -> str:
-        if self._config is None:
-            self._load_config()
-        return self._config.get("dependencies_dir", '.')
+    def config(self) -> FogConfig:
+        return self._config
 
     @property
     def manifest_dir(self):
@@ -211,6 +223,14 @@ class FogRepoManager:
                 print(f'Found manifest.json in location: {it.path}')
                 return json.loads(it.decoded_content)
         raise RuntimeError('manifest.json not found in parent repository!')
+
+    def get_parent_config(self) -> Optional[FogConfig]:
+        try:
+            config_file = self.parent.get_contents(FogConfig.FILENAME)
+        except github.UnknownObjectException:
+            return None
+        else:
+            return FogConfig(json.loads(config_file.decoded_content))
 
     def get_autoupdate_pr(self):
         pulls = self.fork.get_pulls(state='open', base=FOG_BASE, head=FOG_PR_BRANCH)
@@ -352,6 +372,14 @@ def sync(api) -> bool:
         except subprocess.CalledProcessError:
             print(f'Warning: Cannot checkout {path} from remote {FOG_BASE}')
 
+    upstream_config = api.get_parent_config()
+    if upstream_config is not None:
+        deps = upstream_config.dependencies_dir
+        print(f'Removing found dependencies directory {deps}')
+        _run(f'git rm -rf {deps}')
+    else:
+        print(f'No dependencies_dir found in upstream config. Proceeding')
+
     print('commit and push if any changes')
     if _run('git diff-index --quiet --cached HEAD', check=False).returncode == 1:
         _run(f'git commit -m "Merge upstream"')
@@ -391,7 +419,7 @@ def build(output, user_repo_name):
         pip_platform = "win32"
     elif sys.platform == "darwin":
         pip_platform = "macosx_10_13_x86_64"
-    pip_target = (outpath / local_repo.dependencies_dir).as_posix()
+    pip_target = (outpath / local_repo.config.dependencies_dir).as_posix()
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
         _run(f'pip-compile {local_repo.requirements_path.as_posix()} --output-file=-', stdout=tmp, stderr=subprocess.PIPE, capture_output=False)
