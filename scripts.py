@@ -375,8 +375,8 @@ def sync(api) -> bool:
     upstream_config = api.get_parent_config()
     if upstream_config is not None and upstream_config.dependencies_dir != '.':
         deps = upstream_config.dependencies_dir
-        print(f'Unstaging found dependencies directory "{deps}"')
-        _run(f'git reset {deps}')
+        print(f'Unstaging dependencies directory "{deps}" if present')
+        _run(f'git reset {deps}', check=False)
     else:
         print(f'No dependencies_dir found in upstream config. Proceeding')
 
