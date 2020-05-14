@@ -400,7 +400,7 @@ def build(output, user_repo_name):
     local_repo = LocalRepo()
     src = local_repo.manifest_dir.resolve()
 
-    outpath = pathlib.Path(output).resolve()
+    outpath = pathlib.Path(os.path.expanduser(output)).resolve()
     try:
         outpath.relative_to(src)
     except ValueError:
