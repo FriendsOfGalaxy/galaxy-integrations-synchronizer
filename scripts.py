@@ -400,7 +400,7 @@ def build(output, user_repo_name):
     local_repo = LocalRepo()
     src = local_repo.manifest_dir.resolve()
 
-    outpath = pathlib.Path(os.path.expanduser(output)).resolve()
+    outpath = pathlib.Path(output).resolve()
     try:
         outpath.relative_to(src)
     except ValueError:
@@ -522,6 +522,12 @@ def update_release_file(api):
     _run(f'git push {ORIGIN_REMOTE} HEAD:{FOG_BASE}')
 
 
+class ExpandPath(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string):
+        expanded = os.path.expanduser(values)
+        setattr(namespace, self.dest, expanded)
+
+
 def main():
     mailer = SmtpGmailSender('mailer.fog@gmail.com', os.environ['MAILER_PASSWORD'])
     current_dir = pathlib.Path(os.getcwd()).name
@@ -529,7 +535,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('task', choices=['sync', 'build', 'release', 'update_release_file'])
-    parser.add_argument('--dir', required=sys.argv[1] in ['build', 'release'], help='build directory')
+    parser.add_argument('--dir', required=sys.argv[1] in ['build', 'release'], help='build directory', action=ExpandPath)
     parser.add_argument('--token', default=os.environ.get('GITHUB_TOKEN'), help='github token with repo access')
     parser.add_argument('--repo', default=default_repo, help='github_user/repository_name')
     args = parser.parse_args()
