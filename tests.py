@@ -13,7 +13,7 @@ from distutils.version import StrictVersion
 
 @pytest.fixture()
 def manifest():
-    target_dir = os.environ['TARGET']
+    target_dir = os.path.expanduser(os.environ['TARGET'])
     with open(target_dir + '/manifest.json', 'r') as f:
         manifest = json.load(f)
     return manifest
