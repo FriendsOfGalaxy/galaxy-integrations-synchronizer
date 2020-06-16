@@ -522,23 +522,16 @@ def main():
         raise RuntimeError('Github token not found. Have you set it in secrets?')
     man = FogRepoManager(args.token, args.repo)
 
-    try:
-        if args.task == 'sync':
-            if sync(man):
-                # Workaround for not working pull_request on forks: https://github.community/t5/GitHub-Actions/Github-Workflow-not-running-from-pull-request-from-forked/m-p/33484/highlight/true#M1524
-                man.send_repository_dispatch('validation')
-        elif args.task == 'release':
-            release(args.dir)
-        elif args.task == 'update_release_file':
-            update_release_file(man)
-        else:
-            raise RuntimeError(f'unknown command {args.task}')
-    except Exception:
-        sha = _run('git rev-parse --verify HEAD').stdout.strip()
-        subject = f'Workflow {args.task} failed for repo {args.repo}'
-        body = f'https://github.com/{args.repo}/actions'
-        body += f'\n\n Last check for this sha: https://github.com/{args.repo}/commit/{sha}/checks'
-        raise
+    if args.task == 'sync':
+        if sync(man):
+            # Workaround for not working pull_request on forks: https://github.community/t5/GitHub-Actions/Github-Workflow-not-running-from-pull-request-from-forked/m-p/33484/highlight/true#M1524
+            man.send_repository_dispatch('validation')
+    elif args.task == 'release':
+        release(args.dir)
+    elif args.task == 'update_release_file':
+        update_release_file(man)
+    else:
+        raise RuntimeError(f'unknown command {args.task}')
 
 
 if __name__ == "__main__":
