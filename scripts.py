@@ -14,10 +14,6 @@ import subprocess
 import urllib.request
 from typing import Optional
 
-import smtplib, ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
 from collections import namedtuple
 from distutils.dir_util import copy_tree
 from distutils.file_util import copy_file
@@ -58,28 +54,6 @@ def _run(*args, **kwargs):
     else:
         print('>>', out.stdout)
         return out
-
-
-class SmtpGmailSender:
-    """Workaround for github false positives about failed action notifications"""
-
-    def __init__(self, email, password):
-        self.email = email
-        self.password = password
-        self.host = "smtp.gmail.com"
-        self.port = smtplib.SMTP_SSL_PORT
-
-    def send(self, to, subject, body):
-        msg = MIMEMultipart()
-        msg['From'] = self.email
-        msg['To'] = to
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body))
-
-        context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(self.host, self.port, context=context) as server:
-            server.login(self.email, self.password)
-            server.sendmail(self.email, to, msg.as_string())
 
 
 class FogConfig:
@@ -529,7 +503,6 @@ class ExpandPath(argparse.Action):
 
 
 def main():
-    mailer = SmtpGmailSender('mailer.fog@gmail.com', os.environ['MAILER_PASSWORD'])
     current_dir = pathlib.Path(os.getcwd()).name
     default_repo = f'{FOG_USER.login}/{current_dir}'
 
@@ -549,25 +522,16 @@ def main():
         raise RuntimeError('Github token not found. Have you set it in secrets?')
     man = FogRepoManager(args.token, args.repo)
 
-    try:
-        if args.task == 'sync':
-            if sync(man):
-                mailer.send(FOG_USER.email, f'New update for {args.repo}', f'https://github.com/{args.repo}/pulls')
-                # Workaround for not working pull_request on forks: https://github.community/t5/GitHub-Actions/Github-Workflow-not-running-from-pull-request-from-forked/m-p/33484/highlight/true#M1524
-                man.send_repository_dispatch('validation')
-        elif args.task == 'release':
-            release(args.dir)
-        elif args.task == 'update_release_file':
-            update_release_file(man)
-        else:
-            raise RuntimeError(f'unknown command {args.task}')
-    except Exception:
-        sha = _run('git rev-parse --verify HEAD').stdout.strip()
-        subject = f'Workflow {args.task} failed for repo {args.repo}'
-        body = f'https://github.com/{args.repo}/actions'
-        body += f'\n\n Last check for this sha: https://github.com/{args.repo}/commit/{sha}/checks'
-        mailer.send(FOG_USER.email, subject, body)
-        raise
+    if args.task == 'sync':
+        if sync(man):
+            # Workaround for not working pull_request on forks: https://github.community/t5/GitHub-Actions/Github-Workflow-not-running-from-pull-request-from-forked/m-p/33484/highlight/true#M1524
+            man.send_repository_dispatch('validation')
+    elif args.task == 'release':
+        release(args.dir)
+    elif args.task == 'update_release_file':
+        update_release_file(man)
+    else:
+        raise RuntimeError(f'unknown command {args.task}')
 
 
 if __name__ == "__main__":

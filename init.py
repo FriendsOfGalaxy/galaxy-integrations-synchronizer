@@ -26,6 +26,10 @@ def edit_metadata(man: FogRepoManager):
     return name
 
 
+def watch_fork(man: FogRepoManager):
+    man.user.add_to_watched(man.fork)
+
+
 def purge_content(man: FogRepoManager):
     """
     Remove all content and create first commit with our files.
@@ -127,6 +131,7 @@ if __name__ == "__main__":
 
     fork = fork_repo(token, args.repo)
     man = FogRepoManager(token, fork.full_name)
+    watch_fork(man)
     updated_repo_name = edit_metadata(man)
     add_to_synced(updated_repo_name)
     if args.purge:
