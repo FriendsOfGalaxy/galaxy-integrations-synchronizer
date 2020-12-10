@@ -22,7 +22,7 @@ jobs:
     - name: Download scripts
       run: |
         curl https://raw.githubusercontent.com/FriendsOfGalaxy/galaxy-integrations-updater/master/scripts.py --output ../scripts.py
-        python -m pip install PyGithub==1.43
+        python -m pip install PyGithub==1.54
 
     - name: Check and sync to PR
       env:
