@@ -19,8 +19,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from collections import namedtuple
-from distutils.dir_util import copy_tree
-from distutils.file_util import copy_file
 from distutils.version import StrictVersion
 
 import github
