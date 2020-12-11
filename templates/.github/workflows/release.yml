@@ -63,9 +63,6 @@ jobs:
       with:
         python-version: 3.7
 
-    - name: Install hub
-      uses: geertvdc/setup-hub@master
-
     - name: Setup scripts
       run: |
         curl https://raw.githubusercontent.com/FriendsOfGalaxy/galaxy-integrations-updater/master/scripts.py --output ../scripts.py
