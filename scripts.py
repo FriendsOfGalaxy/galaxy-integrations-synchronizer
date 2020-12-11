@@ -499,21 +499,21 @@ def release(build_dir, api: FogRepoManager):
         pathlib.Path(zip_assets_dir).absolute() / filename
         for filename in os.listdir(zip_assets_dir)
     ]
-    tag = LocalRepo().get_local_version()
+    version_tag = LocalRepo().get_local_version()
 
-    print(f'Creating tag {tag} and releasing on github with assets: {asset_paths}')
-    api.release(tag, *asset_paths)
+    print(f'Creating tag {version_tag} and releasing on github with assets: {asset_paths}')
+    api.release(version_tag, *asset_paths)
 
 
 def update_release_file(api):
     release = api.get_latest_release()
-    tag = release.tag_name
+    version_tag = release.tag_name
 
     local_tag = LocalRepo().get_local_version()
-    assert tag == local_tag, f"remote tag '{tag}' does not match local one '{local_tag}'"
+    assert version_tag == local_tag, f"remote tag '{version_tag}' does not match with the local one '{local_tag}'"
     
     data = {
-        "tag_name": tag,
+        "tag_name": version_tag,
         "assets": [
             {k: asset[k] for k in ('browser_download_url', 'name')}
             for asset in release.raw_data['assets']
