@@ -15,8 +15,6 @@ import urllib.request
 from typing import Optional
 
 from collections import namedtuple
-from distutils.dir_util import copy_tree
-from distutils.file_util import copy_file
 from distutils.version import StrictVersion
 
 import github
@@ -26,13 +24,13 @@ GitUser = namedtuple('GitUser', ['login', 'email'])
 FOG_USER = GitUser('FriendsOfGalaxy', 'FriendsOfGalaxy@gmail.com')
 BOT_USER = GitUser('FriendsOfGalaxyBot', 'FriendsOfGalaxy+bot@gmail.com')
 
-RELEASE_MESSAGE = "Release version {tag}\n\nVersion {tag}"
+RELEASE_NAME_MESSAGE = "Release version {tag}:Version {tag}"
 RELEASE_FILE ="current_version.json"
 RELEASE_FILE_COMMIT_MESSAGE = "Updated current_version.json"
 
 FOG_BASE = 'master'
 FOG_PR_BRANCH = 'autoupdate'
-UPSTREAM_REMOTE = '_upstream'  # '_' to avoid `hub` heuristics: https://github.com/github/hub/issues/2296
+UPSTREAM_REMOTE = 'upstream'
 ORIGIN_REMOTE = 'origin'
 PATHS_TO_EXCLUDE = ['README.md', '.github/', RELEASE_FILE]
 
@@ -255,6 +253,28 @@ class FogRepoManager:
                 raise
         else:
             git_ref.delete()
+    
+    def release(self, tag: str, *asset_paths: pathlib.Path):
+        name, message = RELEASE_NAME_MESSAGE.format(tag=tag).split(':')
+        release = self.fork.create_git_release(
+            tag=tag,
+            name=name,
+            message=message,
+            draft=True,
+            target_commitish=FOG_BASE  # lightweigth tag is created from here
+        )
+        try:
+            for asset in asset_paths:
+                release.upload_asset(str(asset))
+            release.update_release(name=name, message=message, draft=False)
+        except Exception as e:
+            print(f'Failed to finalize release with uploaded assets: {repr(e)}.\nRemoving release...')
+            release.delete_release()
+        else:
+            print(f'Release for {tag} sucessfully created with assets')
+    
+    def get_latest_release(self) -> github.GitRelease.GitRelease:
+        return self.fork.get_latest_release()
 
     def send_repository_dispatch(self, event_type):
         url = f'https://api.github.com/repos/{self.fork.full_name}/dispatches'
@@ -420,7 +440,7 @@ def build(output, user_repo_name):
         json.dump(manifest, f, indent=4)
 
 
-def release(build_dir):
+def release(build_dir, api: FogRepoManager):
     """Zips dirs given in build_dir and upload them with newly created github release
     build_dir should contain asset for windows and/or macos.
     Asset names should start with 'windows' or 'macos' (case insensitive)
@@ -449,41 +469,29 @@ def release(build_dir):
         else:
             RuntimeError(f'No asset for {zip_name}!')
 
-    print(f'Preparing command for adding assets from {zip_assets_dir}')
-    asset_cmd = []
-    filenames = os.listdir(zip_assets_dir)
-    for filename in filenames:
-        asset_cmd.append('-a')
-        path = str(pathlib.Path(zip_assets_dir).absolute() / filename)
-        print('=== found zip: ', path)
-        asset_cmd.append(path)
-
+    asset_paths = [
+        pathlib.Path(zip_assets_dir).absolute() / filename
+        for filename in os.listdir(zip_assets_dir)
+    ]
     version_tag = LocalRepo().get_local_version()
 
-    print(f'Creating tag {version_tag} and releasing on github with assets')
-    _run('hub', 'release', 'create', version_tag,
-        '-m', RELEASE_MESSAGE.format(tag=version_tag),
-        *asset_cmd
-    )
+    print(f'Creating tag {version_tag} and releasing on github with assets: {asset_paths}')
+    api.release(version_tag, *asset_paths)
 
 
 def update_release_file(api):
-    version_tag = LocalRepo().get_local_version()
+    release = api.get_latest_release()
+    version_tag = release.tag_name
 
-    proc = _run(f'hub release show --show-downloads {version_tag}', text=True)
-    lines = proc.stdout.split()
-    zip_urls = [ln for ln in lines if ln.endswith('.zip')]
-
-    assets = []
-    for url in zip_urls:
-        asset = {
-            "browser_download_url": url,
-            "name": url.split('/')[-1]
-        }
-        assets.append(asset)
+    local_tag = LocalRepo().get_local_version()
+    assert version_tag == local_tag, f"remote tag '{version_tag}' does not match with the local one '{local_tag}'"
+    
     data = {
         "tag_name": version_tag,
-        "assets": assets
+        "assets": [
+            {k: asset[k] for k in ('browser_download_url', 'name')}
+            for asset in release.raw_data['assets']
+        ]
     }
     with open(RELEASE_FILE, 'w') as f:
         json.dump(data, f, indent=4)
@@ -527,7 +535,7 @@ def main():
             # Workaround for not working pull_request on forks: https://github.community/t5/GitHub-Actions/Github-Workflow-not-running-from-pull-request-from-forked/m-p/33484/highlight/true#M1524
             man.send_repository_dispatch('validation')
     elif args.task == 'release':
-        release(args.dir)
+        release(args.dir, man)
     elif args.task == 'update_release_file':
         update_release_file(man)
     else:
