@@ -298,7 +298,9 @@ class FogRepoManager:
             release.delete_release()
         else:
             print(f'Release for {tag} sucessfully created with assets')
-
+    
+    def get_latest_release(self) -> github.GitRelease.GitRelease:
+        return self.fork.get_latest_release()
 
     def send_repository_dispatch(self, event_type):
         url = f'https://api.github.com/repos/{self.fork.full_name}/dispatches'
@@ -497,29 +499,25 @@ def release(build_dir, api: FogRepoManager):
         pathlib.Path(zip_assets_dir).absolute() / filename
         for filename in os.listdir(zip_assets_dir)
     ]
-    version_tag = LocalRepo().get_local_version()
+    tag = LocalRepo().get_local_version()
 
-    print(f'Creating tag {version_tag} and releasing on github with assets: {asset_paths}')
-    api.release(version_tag, *asset_paths)
+    print(f'Creating tag {tag} and releasing on github with assets: {asset_paths}')
+    api.release(tag, *asset_paths)
 
 
 def update_release_file(api):
-    version_tag = LocalRepo().get_local_version()
+    release = api.get_latest_release()
+    tag = release.tag_name
 
-    proc = _run(f'hub release show --show-downloads {version_tag}', text=True)
-    lines = proc.stdout.split()
-    zip_urls = [ln for ln in lines if ln.endswith('.zip')]
-
-    assets = []
-    for url in zip_urls:
-        asset = {
-            "browser_download_url": url,
-            "name": url.split('/')[-1]
-        }
-        assets.append(asset)
+    local_tag = LocalRepo().get_local_version()
+    assert tag == local_tag, f"remote tag '{tag}' does not match local one '{local_tag}'"
+    
     data = {
-        "tag_name": version_tag,
-        "assets": assets
+        "tag_name": tag,
+        "assets": [
+            {k: asset[k] for k in ('browser_download_url', 'name')}
+            for asset in release.raw_data['assets']
+        ]
     }
     with open(RELEASE_FILE, 'w') as f:
         json.dump(data, f, indent=4)
