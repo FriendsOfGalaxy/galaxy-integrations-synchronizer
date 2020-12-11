@@ -34,7 +34,7 @@ RELEASE_FILE_COMMIT_MESSAGE = "Updated current_version.json"
 
 FOG_BASE = 'master'
 FOG_PR_BRANCH = 'autoupdate'
-UPSTREAM_REMOTE = '_upstream'  # '_' to avoid `hub` heuristics: https://github.com/github/hub/issues/2296
+UPSTREAM_REMOTE = 'upstream'
 ORIGIN_REMOTE = 'origin'
 PATHS_TO_EXCLUDE = ['README.md', '.github/', RELEASE_FILE]
 
