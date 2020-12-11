@@ -294,7 +294,7 @@ class FogRepoManager:
                 release.upload_asset(str(asset))
             release.update_release(name=name, message=message, draft=False)
         except Exception as e:
-            print(f'Failed to upload assets: {repr(e)}.\nRemoving release...')
+            print(f'Failed to finalize release with uploaded assets: {repr(e)}.\nRemoving release...')
             release.delete_release()
         else:
             print(f'Release for {tag} sucessfully created with assets')
