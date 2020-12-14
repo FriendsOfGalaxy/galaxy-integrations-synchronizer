@@ -4,12 +4,13 @@ import requests
 import argparse
 
 
-token = os.environ['FOG_GITHUB_TOKEN']
-
 parser = argparse.ArgumentParser()
 parser.add_argument('repo', help='repository_name, for example "galaxy-integrations-updater"')
 parser.add_argument('event_type', help='event type, for example "update_templates"')
+parser.add_argument('--token', help='github token with repo access')
 args = parser.parse_args()
+
+token = args.token or os.environ['FOG_GITHUB_TOKEN']
 
 url = f'https://api.github.com/repos/FriendsOfGalaxy/{args.repo}/dispatches'
 body = {
@@ -17,11 +18,11 @@ body = {
 }
 headers = {
     "Authorization": "token " + token,
-    "Accept": "application/vnd.github.everest-preview+json, application/vnd.github.v3+json",
+    "Accept": "application/vnd.github.v3+json",
     "Content-Type": "application/json"
 }
 
-print(f'Sending url={url}, body={body}, headers={headers}')
+print(f'Sending url={url}, json={body}, headers={headers}')
 r = requests.post(url=url, json=body, headers=headers)
 
 if r.status_code > 300:
